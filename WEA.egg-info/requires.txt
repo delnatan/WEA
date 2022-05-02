@@ -1,6 +1,0 @@
-numpy
-scikit-image
-cellpose
-scipy
-matplotlib
-mrc

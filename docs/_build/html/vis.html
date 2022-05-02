@@ -1,0 +1,190 @@
+
+
+<!doctype html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Visualization functions &#8212; WEA  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/bizstyle.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Input/output functionalities" href="io.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <!--[if lt IE 9]>
+    <script src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="io.html" title="Input/output functionalities"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Visualization functions</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="module-WEA.vis">
+<span id="visualization-functions"></span><h1>Visualization functions<a class="headerlink" href="#module-WEA.vis" title="Permalink to this headline">¶</a></h1>
+<p>visualization of images</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.drawSegmentationBorder">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">drawSegmentationBorder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rgbimg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">border_hue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">border_sat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thickness</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">already_edge</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.drawSegmentationBorder" title="Permalink to this definition">¶</a></dt>
+<dd><p>draw segmentation result as a border</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.get_indexer">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">get_indexer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_slice</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.get_indexer" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns slice objects for indexing</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.makeRGBComposite">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">makeRGBComposite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_hues</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(195.0,</span> <span class="pre">100.0,</span> <span class="pre">320.0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_sats</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip_low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip_high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_compress</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(False,</span> <span class="pre">False,</span> <span class="pre">False)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.makeRGBComposite" title="Permalink to this definition">¶</a></dt>
+<dd><p>create a color image composite using HSV specifications</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>img</strong> (<em>numpy 3-D array</em>) – input multi-channel image</p></li>
+<li><p><strong>ch_axis</strong> (<em>int</em>) – the channel index of multi-channel image</p></li>
+<li><p><strong>ch_hues</strong> (<em>list of float</em>) – ranging from 0-360. Must have equal # as ch</p></li>
+<li><p><strong>ch_sats</strong> (<em>list of float</em>) – ranging from 0-100. Must have equal # as ch</p></li>
+<li><p><strong>log_compress</strong> (<em>list of bool</em>) – whether to do a log compression on channel</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>color image in (normalized range, [0-1]) RGB space</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.norm28bit">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">norm28bit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.norm28bit" title="Permalink to this definition">¶</a></dt>
+<dd><p>normalize and convert to 8-bit array</p>
+<p>Input is normalized from 0 to 1 and then multiplied by 255 before
+casting all elements into np.uint8</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>arr</strong> (<em>array</em>) – input array</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>normalized np.uint8 array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.normalize">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">normalize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.normalize" title="Permalink to this definition">¶</a></dt>
+<dd><p>normalizes array from 0 to 1 from its range</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>arr</strong> (<em>array</em>) – input array</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>normalized array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.radial_resampling">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">radial_resampling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img2d</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">oriy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_thetas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">360</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.radial_resampling" title="Permalink to this definition">¶</a></dt>
+<dd><p>radially sample an array from a given origin</p>
+<p>The sampling radius is calculated from the longest distance from origin
+to the corners of the image. The longest radius is used for sampling.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.vis.random_colormap">
+<span class="sig-prename descclassname"><span class="pre">WEA.vis.</span></span><span class="sig-name descname"><span class="pre">random_colormap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.vis.random_colormap" title="Permalink to this definition">¶</a></dt>
+<dd><p>generate random colormap for N categories</p>
+<p>Use as matplotlib colormap. 0 is mapped as ‘black’</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>N</strong> (<em>int</em>) – number of categories</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="io.html"
+                          title="previous chapter">Input/output functionalities</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/vis.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="io.html" title="Input/output functionalities"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Visualization functions</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Daniel Elnatan.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
+    </div>
+  </body>
+</html>

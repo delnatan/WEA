@@ -1,0 +1,11 @@
+setup.py
+WEA/___WACpy.py
+WEA/__init__.py
+WEA/core.py
+WEA/io.py
+WEA/vis.py
+WEA.egg-info/PKG-INFO
+WEA.egg-info/SOURCES.txt
+WEA.egg-info/dependency_links.txt
+WEA.egg-info/requires.txt
+WEA.egg-info/top_level.txt

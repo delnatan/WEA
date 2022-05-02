@@ -1,0 +1,341 @@
+
+
+<!doctype html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Core functionalities &#8212; WEA  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/bizstyle.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Input/output functionalities" href="io.html" />
+    <link rel="prev" title="WEA (Wound Edge Analysis)" href="index.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <!--[if lt IE 9]>
+    <script src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="io.html" title="Input/output functionalities"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="WEA (Wound Edge Analysis)"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Core functionalities</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="module-WEA.core">
+<span id="core-functionalities"></span><h1>Core functionalities<a class="headerlink" href="#module-WEA.core" title="Permalink to this headline">¶</a></h1>
+<p>Wound edge analysis modules and functions</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="WEA.core.Cell">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">Cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.Cell" title="Permalink to this definition">¶</a></dt>
+<dd><p>an abstract cell representation</p>
+<dl class="simple">
+<dt>Each cell contains its:</dt><dd><ul class="simple">
+<li><p>raw data (cropped by cytoplasmic mask)</p></li>
+<li><p>cytoplasm, nucleus, and wound edge masks (if available)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="WEA.core.Cell.compute_migration_axis">
+<span class="sig-name descname"><span class="pre">compute_migration_axis</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.Cell.compute_migration_axis" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns position of migration axis on the wound edge</p>
+<p>computed as an ‘area’-weighted direction from the nucleus centroid
+such that larger distances along the wound edge carries more weight
+in determining the migration axis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>y,x position of along the wound edge</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="WEA.core.Cell.get_mtoc">
+<span class="sig-name descname"><span class="pre">get_mtoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tub_channel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aperture_radius</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.Cell.get_mtoc" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns centrosome locations and whether its within the nucleus</p>
+<p>‘mother’ vs ‘daughter’ is distinguished by having higher vs lower
+microtubule intensity with a 5-pixel radius</p>
+<p>‘nuc’ vs ‘cyto’ indicates whether the centriole is on the nucleus or
+in the cytoplasm</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tub_channel</strong> (<em>int</em>) – channel for tubulin intensities</p></li>
+<li><p><strong>radius</strong> (<em>int</em>) – radius of aperture used for integrating tubulin ch.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Dictionary containing key pairs (‘mother’, ‘nuc’/’cyto’)
+with its (y,x) coordinate</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.assignMasks">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">assignMasks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">labcells</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labnuclei</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">woundedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">small_cell_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.assignMasks" title="Permalink to this definition">¶</a></dt>
+<dd><p>assign labels to wound edge and nuclei based on cell segmentation</p>
+<p>Cells that are located at the boundary (truncated by the border) is thrown
+out. Spurious objects with less than &lt;400 px area (small “cells”) area also
+removed by default.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>labcells</strong> (<em>array of int</em>) – labelled cells (cellpose output)</p></li>
+<li><p><strong>labnuclei</strong> (<em>array of int</em>) – labelled nuclei (cellpose output)</p></li>
+<li><p><strong>woundedge</strong> (<em>array of bool</em>) – wound edge mask (generated from <cite>isolateWoundArea</cite>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Labelled cells, labelled nuclei and labelled wound edge</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.collect_cells">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">collect_cells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pathstr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.collect_cells" title="Permalink to this definition">¶</a></dt>
+<dd><p>get a collection of cells</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.compute_s_values">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">compute_s_values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmlocs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.compute_s_values" title="Permalink to this definition">¶</a></dt>
+<dd><p>computes <cite>characteristic value</cite> of each local maxima</p>
+<p>Characteristic value is the <cite>curvature</cite> times the mean intensity.
+Calculated according to the Thomann, D, et al. 2002 paper.
+This algorithm is easily extensible to 3D. Just need to form the 3x3
+hessian matrix and compute determinant with a routine.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>img</strong> (<em>2d-array</em>) – input image</p></li>
+<li><p><strong>lmlocs</strong> (<em>Nx2 array</em>) – coordinates of local maxima (Nrows x Ncolumns)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>array of s-values (Nx1 array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.find_2d_spots">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">find_2d_spots</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.find_2d_spots" title="Permalink to this definition">¶</a></dt>
+<dd><p>finds local maxima based on local curvature and intensity</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>img</strong> (<em>2d-array</em>) – input image</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>coordinates local maxima in (row, column) coordinates</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.get_indexer">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">get_indexer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_slice</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.get_indexer" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns slice objects for indexing</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.isolateWoundArea">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">isolateWoundArea</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">labcells</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">empty_area_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.isolateWoundArea" title="Permalink to this definition">¶</a></dt>
+<dd><p>identify ‘wound’ edge from labelled cells</p>
+<p>Wound edge is defined as a non-cell area that is larger than approximately
+100x100 pixels. The wound is identified as the the dilated wound area
+that intersects with the cells.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>labcells</strong> (<em>array of int</em>) – labelled cell segmentation (from Cellpose)</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>binary mask of the wound edge (~2 pixel thick)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.normalize">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">normalize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.normalize" title="Permalink to this definition">¶</a></dt>
+<dd><p>normalize input array to its dynamic range</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.relative_angle">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">relative_angle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.relative_angle" title="Permalink to this definition">¶</a></dt>
+<dd><p>compute relative angle between vectors</p>
+<p>positive : counter-clockwise
+negative : clockwise
+<a class="reference external" href="https://wumbo.net/formula/angle-between-two-vectors-2d/">https://wumbo.net/formula/angle-between-two-vectors-2d/</a></p>
+<p>assuming that v = (y, x)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.segmentCell">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">segmentCell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imglist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dxy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">celldiam</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">65.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.segmentCell" title="Permalink to this definition">¶</a></dt>
+<dd><p>segment cell using Cellpose</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputimg</strong> (<em>a list of RGB images</em>) – input images with dimensions Nr x Nc x Nch.
+Only channels 2 &amp; 3 (green &amp; blue) are used.</p></li>
+<li><p><strong>celldiam</strong> (<em>float</em>) – average cell diameter in micron</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>binary mask of cells</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.segmentNucleus">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">segmentNucleus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imglist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dxy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nucdiam</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">14.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.segmentNucleus" title="Permalink to this definition">¶</a></dt>
+<dd><p>segment nuclei using Cellpose</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputimg</strong> (<em>a list of grayscale images</em>) – input images with dimensions Nr x Nc.</p></li>
+<li><p><strong>nucdiam</strong> (<em>float</em>) – average diameter of a nuclei in micron</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>binary mask of nuclei</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.separateEdgeCells">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">separateEdgeCells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rawimg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">celldiam</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">65.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nucdiam</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">14.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shrink_by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">empty_area_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'wrk'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'WEA_analysis'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.separateEdgeCells" title="Permalink to this definition">¶</a></dt>
+<dd><p>all units are expressed in micron (micron^2 for area).
+Metadata should contain a dictionary with at least these keys:
+“dxy”, for pixel size information</p>
+<p>The output is saved at original resolution, but processing is done on
+resized images.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.sort_edge_coords">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">sort_edge_coords</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">single_pixel_edge_mask</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">endpt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.sort_edge_coords" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns sorted edge coordinates (y,x)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>single_pixel_edge_mask</strong> (<em>bool nd.array</em>) – skeletonized wound edge mask</p></li>
+<li><p><strong>endpt</strong> (<em>2-tuple of int</em>) – endpoint coordinate (y,x)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>N x 2 array (y,x) coordinate of the wound edge</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.core.trace_object_boundary">
+<span class="sig-prename descclassname"><span class="pre">WEA.core.</span></span><span class="sig-name descname"><span class="pre">trace_object_boundary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bwimg</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.core.trace_object_boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>trace binary object boundary</p>
+<p>Using algorithm in Cris Luengo’s blog: <a class="reference external" href="https://www.crisluengo.net/archives/324/">https://www.crisluengo.net/archives/324/</a>
+Note: assumes there’s only one object in image, so it works only with
+isolated masks.</p>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="index.html"
+                          title="previous chapter">WEA (Wound Edge Analysis)</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="io.html"
+                          title="next chapter">Input/output functionalities</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/core.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="io.html" title="Input/output functionalities"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="WEA (Wound Edge Analysis)"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Core functionalities</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Daniel Elnatan.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
+    </div>
+  </body>
+</html>

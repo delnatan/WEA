@@ -1,0 +1,152 @@
+
+
+<!doctype html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Input/output functionalities &#8212; WEA  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/bizstyle.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Visualization functions" href="vis.html" />
+    <link rel="prev" title="Core functionalities" href="core.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <!--[if lt IE 9]>
+    <script src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="vis.html" title="Visualization functions"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="core.html" title="Core functionalities"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Input/output functionalities</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="module-WEA.io">
+<span id="input-output-functionalities"></span><h1>Input/output functionalities<a class="headerlink" href="#module-WEA.io" title="Permalink to this headline">¶</a></h1>
+<p>Image io for WAC</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="WEA.io.CanonizedImage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">WEA.io.</span></span><span class="sig-name descname"><span class="pre">CanonizedImage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.io.CanonizedImage" title="Permalink to this definition">¶</a></dt>
+<dd><p>class to conveniently handle various image structures and metadata</p>
+<p>The canonized image should have its axes arranges by “zyxc”, where
+the last axis corresponds to channel. Time axis is not supported.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="WEA.io.CanonizedImage.get_focused_plane">
+<span class="sig-name descname"><span class="pre">get_focused_plane</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.io.CanonizedImage.get_focused_plane" title="Permalink to this definition">¶</a></dt>
+<dd><p>return best focused z-slice in all channel</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.io.find_focus">
+<span class="sig-prename descclassname"><span class="pre">WEA.io.</span></span><span class="sig-name descname"><span class="pre">find_focus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img3d</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.io.find_focus" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns index of in-focus plane</p>
+<p>Given a 3D image with (z, y, x) axis ordering</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>integer index at plane of best focus</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="WEA.io.sobel_intensity_np">
+<span class="sig-prename descclassname"><span class="pre">WEA.io.</span></span><span class="sig-name descname"><span class="pre">sobel_intensity_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#WEA.io.sobel_intensity_np" title="Permalink to this definition">¶</a></dt>
+<dd><p>do sobel filtering on 3D image, “zyx” axis ordering</p>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="core.html"
+                          title="previous chapter">Core functionalities</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="vis.html"
+                          title="next chapter">Visualization functions</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/io.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="vis.html" title="Visualization functions"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="core.html" title="Core functionalities"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">WEA  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Input/output functionalities</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Daniel Elnatan.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
+    </div>
+  </body>
+</html>

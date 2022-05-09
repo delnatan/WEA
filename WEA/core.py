@@ -7,6 +7,8 @@ import torch
 import re
 import numpy as np
 import cv2
+
+from pathlib import Path
 from cellpose import models
 from scipy.ndimage import (
     maximum_filter,
@@ -31,6 +33,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from .vis import makeCellComposite, makeRGBComposite, drawSegmentationBorder
+from . import __file__
 
 logging.basicConfig(filename="WEA_dev.log", filemode="w", level=logging.DEBUG)
 
@@ -40,14 +43,17 @@ if torch.cuda.is_available():
 else:
     use_gpu = False
 
+
+__model_dir = Path(__file__).parent
+
+
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu,
-    pretrained_model="/Users/delnatan/.cellpose/models/CP_bcat-nuc_v01",
+    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
 )
 
 nucengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model="/Users/delnatan/.cellpose/models/CP_dapi_v01"
+    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
 )
 
 
@@ -79,9 +85,7 @@ def bbox2(img):
 
 
 class ImageField:
-    def __init__(
-        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
-    ):
+    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -142,10 +146,7 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img,
-            diameter=self._celldiam,
-            resample=True,
-            channels=[2, 3],
+            img, diameter=self._celldiam, resample=True, channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
@@ -173,13 +174,11 @@ class ImageField:
     def run_detection(self, cell_diam=68.0, nuc_diam=15.0):
 
         if self.cp_labcells is None:
-            self.segmentCell(celldiam=cell_diam, nucdiam=nuc_diam)
+            self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam)
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(
-            ~cellarea, min_size=self._celldiam**2
-        )
+        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -252,13 +251,9 @@ class ImageField:
                 ci = cmin - 2
                 cf = cmax + 3
                 mask_ = cell_mask[ri:rf, ci:cf]
-                nuc_ = (self.labnucs[ri:rf, ci:cf] > 0) * cell_mask[
-                    ri:rf, ci:cf
-                ]
+                nuc_ = (self.labnucs[ri:rf, ci:cf] > 0) * cell_mask[ri:rf, ci:cf]
                 cell_boundary = trace_object_boundary(cell_mask[ri:rf, ci:cf])
-                wound_ = skeletonize(
-                    cell_boundary & self.woundedge[ri:rf, ci:cf]
-                )
+                wound_ = skeletonize(cell_boundary & self.woundedge[ri:rf, ci:cf])
 
                 yield i, mask_, nuc_, wound_
             else:
@@ -320,9 +315,7 @@ class _Cell__old:
     """
 
     def __init__(
-        self,
-        folder,
-        num,
+        self, folder, num,
     ):
         self.root = Path(folder)
         cell_ptn = "cell_{:d}.tif"
@@ -336,9 +329,7 @@ class _Cell__old:
         self.nucleus_mask = imread(self.root / nucmask_ptn.format(num))
 
         # shrink the nucleus a bit to compensate for 'cyto' model mask
-        self.nucleus_mask = np.uint8(
-            binary_erosion(self.nucleus_mask > 0, disk(10))
-        )
+        self.nucleus_mask = np.uint8(binary_erosion(self.nucleus_mask > 0, disk(10)))
 
         edge = self.root.stem == "edge"
         self.endpoints_computed = False
@@ -552,9 +543,7 @@ class _Cell__old:
             mtoc_vector = mtoc[0] - origin
             relative_theta = relative_angle(mtoc_vector, migration_vector)
             # re-append the rest of the metadata about mtoc
-            mtocs_out.append(
-                (np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3])
-            )
+            mtocs_out.append((np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3]))
 
         return mtocs_out
 
@@ -614,8 +603,7 @@ def separateEdgeCells(
     # nuclei can use grayscale image
     nucmask = segmentNucleus(img[0, :, :], metadata["dxy"], nucdiam=nucdiam)
     woundmask = isolateWoundArea(
-        cellmask,
-        empty_area_threshold=empty_area_threshold / (metadata["dxy"] ** 2),
+        cellmask, empty_area_threshold=empty_area_threshold / (metadata["dxy"] ** 2),
     )
     labcells, labnucs, labedge = assignMasks(cellmask, nucmask, woundmask)
 
@@ -760,10 +748,7 @@ def segmentNucleus(imglist, dxy, nucdiam=14.0):
     """
 
     masks, flows, styles, diams = nucengine.eval(
-        imglist,
-        diameter=nucdiam / dxy,
-        resample=True,
-        channels=[0, 0],
+        imglist, diameter=nucdiam / dxy, resample=True, channels=[0, 0],
     )
 
     return masks
@@ -949,9 +934,7 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[
-            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
-        ]
+        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
         if sbox.sum() == 0:
             break
         # move current position
@@ -1046,9 +1029,7 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(
-        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
-    )
+    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -1134,7 +1115,9 @@ def _rescale_mask(img, scale):
     Ly = int(scale * img.shape[0])
     Lx = int(scale * img.shape[1])
     if img.dtype == "bool":
-        out = cv2.resize(img.astype(np.float32), (Lx, Ly), interpolation=cv2.INTER_LINEAR)
+        out = cv2.resize(
+            img.astype(np.float32), (Lx, Ly), interpolation=cv2.INTER_LINEAR
+        )
         return (out > 0).astype(img.dtype)
     elif img.dtype == "int":
         # used for resizing labeled masks

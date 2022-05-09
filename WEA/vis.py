@@ -64,7 +64,7 @@ def random_colormap(N):
 
 def makeRGBComposite(
     img,
-    ch_axis=0,
+    ch_axis=-1,
     ch_hues=(195.0, 100.0, 320.0),
     ch_sats=None,
     clip_low=None,
@@ -100,10 +100,7 @@ def makeRGBComposite(
         hi = clip_high
 
     assert len(ch_hues) == Nch, "Number of channels must match given hues"
-
-    assert (
-        len(ch_sats) == Nch
-    ), "Number of channels must match given saturations"
+    assert len(ch_sats) == Nch, "Number of channels must match given saturations"
 
     # normalize hues & saturation so that [0,1]
     schues = [c / 360.0 for c in ch_hues]
@@ -151,12 +148,7 @@ def makeRGBComposite(
 
 
 def drawSegmentationBorder(
-    rgbimg,
-    labels,
-    border_hue=0.0,
-    border_sat=1.0,
-    thickness=1,
-    already_edge=False,
+    rgbimg, labels, border_hue=0.0, border_sat=1.0, thickness=1, already_edge=False,
 ):
     """draw segmentation result as a border"""
     Nlabels = labels.max()
@@ -207,17 +199,6 @@ def norm28bit(arr):
     return np.uint8(normalize(arr) * 255)
 
 
-def makeCellComposite(img):
-    # green - beta-catenin; take the log to compress dynamic range before normalizing
-    bcat = norm28bit(np.log(img[1, :, :]))
-    # blue - nucleus
-    nucleus = norm28bit(img[0, :, :])
-    rgbcomp = np.zeros(img.shape[1:] + (3,), dtype=np.uint8)
-    rgbcomp[:, :, 1] = bcat
-    rgbcomp[:, :, 2] = nucleus
-    return rgbcomp
-
-
 def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
     """radially sample an array from a given origin
 
@@ -230,9 +211,7 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
         [[0, 0], [0, img2d.shape[-2]], [0, img2d.shape[-1]], img2d.shape[-2:]]
     )
     # compute distance from corners to the given origin
-    cornerdists = np.sqrt(
-        np.sum((corners - np.array([oriy, orix])) ** 2, axis=1)
-    )
+    cornerdists = np.sqrt(np.sum((corners - np.array([oriy, orix])) ** 2, axis=1))
     rmax = np.ceil(cornerdists.max())
     # setup radial vectors
     radvec = np.arange(rmax)
@@ -246,9 +225,9 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
     Nrads = radvec.size
     Nthetas = n_thetas
     yxvec = np.vstack([yvec.ravel(), xvec.ravel()])
-    resampled = map_coordinates(
-        img2d, yxvec, cval=0.0, prefilter=False
-    ).reshape((Nrads, Nthetas))
+    resampled = map_coordinates(img2d, yxvec, cval=0.0, prefilter=False).reshape(
+        (Nrads, Nthetas)
+    )
 
     return resampled
 

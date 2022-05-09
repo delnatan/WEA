@@ -5,6 +5,7 @@ Image io for WAC
 
 from mrc import DVFile
 from nd2reader import ND2Reader
+from tifffile import imread
 from skimage.transform import rescale
 from scipy.ndimage import sobel
 import numpy as np
@@ -45,6 +46,14 @@ class CanonizedImage:
                 #         np.median(np.diff(img.metadata["z_coordinates"])), 3
                 #     )
                 # )
+        elif ext == ".tif" or ext == ".tiff":
+            data = imread(self.filename)
+            # try to infer channel axis
+            ch_axis = np.argmin(data.shape)
+            # and move it as the last axis
+            data = np.moveaxis(data, ch_axis, -1)
+            self.data = data
+
         else:
             raise NotImplementedError
 

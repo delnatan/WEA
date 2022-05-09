@@ -6,12 +6,19 @@ import logging
 import torch
 import re
 import numpy as np
+import cv2
 from cellpose import models
-from scipy.ndimage import maximum_filter, convolve, binary_fill_holes
+from scipy.ndimage import (
+    maximum_filter,
+    convolve,
+    binary_fill_holes,
+    binary_closing,
+)
+from scipy.spatial.distance import cdist
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.measure import label, regionprops
 from skimage.io import imsave, imread
-from skimage.transform import rescale, resize
+from skimage.transform import rescale
 from skimage.morphology import (
     remove_small_objects,
     binary_dilation,
@@ -19,12 +26,13 @@ from skimage.morphology import (
     disk,
     skeletonize,
 )
+from itertools import chain
 from pathlib import Path
 import matplotlib.pyplot as plt
 
 from .vis import makeCellComposite, makeRGBComposite, drawSegmentationBorder
 
-logging.basicConfig(filename="WEA_dev.log", level=logging.DEBUG)
+logging.basicConfig(filename="WEA_dev.log", filemode="w", level=logging.DEBUG)
 
 
 if torch.cuda.is_available():
@@ -33,12 +41,13 @@ else:
     use_gpu = False
 
 # custom models are stored in $HOME/.cellpose/models
-# cytoengine = models.CellposeModel(
-#     gpu=use_gpu, pretrained_model="/Users/delnatan/.cellpose/models/WAEmodel01"
-# )
-cytoengine = models.CellposeModel(gpu=use_gpu, model_type="CP", net_avg=False)
+cytoengine = models.CellposeModel(
+    gpu=use_gpu,
+    pretrained_model="/Users/delnatan/.cellpose/models/CP_bcat-nuc_v01",
+)
+
 nucengine = models.CellposeModel(
-    gpu=use_gpu, model_type="nuclei", net_avg=False
+    gpu=use_gpu, pretrained_model="/Users/delnatan/.cellpose/models/CP_dapi_v01"
 )
 
 
@@ -79,18 +88,31 @@ class ImageField:
         self.cyt_ch = cyto_channel
         self.tub_ch = tubulin_ch
         self.Ny, self.Nx, self.Nch = self.data.shape
+        self.cp_labcells = None
+        self.cp_labnucs = None
+        self.downscale_factor = 1.0
 
-    def _create_cellpose_input(self):
-        s = max(self.Ny, self.Nx)
-        downscale_factor = np.ceil(s / 512)
-        img = rescale(
-            self.data,
-            1 / downscale_factor,
-            channel_axis=-1,
-            preserve_range=True,
-            anti_aliasing=True,
-        )
-        scaled_dxy = self.dxy * downscale_factor
+    def _create_cellpose_input(
+        self, input_cell_diam, target_cell_diam=100, downsize=True
+    ):
+
+        if downsize:
+
+            downscale_factor = target_cell_diam / input_cell_diam
+            self.downscale_factor = downscale_factor
+
+            img = rescale(
+                self.data,
+                downscale_factor,
+                channel_axis=-1,
+                preserve_range=True,
+                anti_aliasing=True,
+            )
+            scaled_dxy = self.dxy / downscale_factor
+        else:
+            img = self.data.astype(np.float32)
+            scaled_dxy = 1.0
+
         # create RGB input
         Ny, Nx = img.shape[0:2]
         cp_input = np.zeros(img.shape[0:2] + (3,), dtype=np.float32)
@@ -99,39 +121,66 @@ class ImageField:
 
         return cp_input, scaled_dxy
 
-    def segment_cells(self, celldiam=65.0, nucdiam=15.0):
-        img, scaled_dxy = self._create_cellpose_input()
+    def segment_cells(self, celldiam=80.0, nucdiam=14.0):
+        """resizes images to about 512x512 and run cellpose
+
+        These defaults have been acquired from working with 3T3 cells. You
+        should change them to suit your images
+
+        Args:
+            celldiam(float, optional): average diameter of the cell in micron.
+            nucdiam(float, optional): average diameter of the nucleus in micron.
+
+
+        """
+
+        unscaled_cell_diam = celldiam / self.dxy
+
+        img, scaled_dxy = self._create_cellpose_input(unscaled_cell_diam)
+
         self._celldiam = celldiam / scaled_dxy
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img, diameter=self._celldiam, resample=True, channels=[2, 3]
+            img,
+            diameter=self._celldiam,
+            resample=True,
+            channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img, diameter=self._nucdiam, resample=True, channels=[3, 0]
+            img,
+            diameter=self._nucdiam,
+            resample=True,
+            channels=[3, 0],
+            compute_masks=True,
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
         logging.info(f"Cellpose input is resized to : {img.shape[0:2]}")
         logging.info("Segmentation run with parameters:")
         logging.info(
-            f"cell diameter={celldiam/scaled_dxy:.2f}, nucleus diameter={nucdiam/scaled_dxy:.2f}."
+            f"cell diameter={celldiam/scaled_dxy:.2f} px, nucleus diameter={nucdiam/scaled_dxy:.2f} px."
         )
 
         self.cp_input = img
         self.cp_labcells = cmask
+        # internal variables used to resample cell mask
+        self._cyt_dP = cflow[1]
+        self._cyt_cellprob = cflow[2]
         self.cp_labnucs = nmask
 
-    def run_detection(self, cell_diam=65.0, nuc_diam=15.0):
+    def run_detection(self, cell_diam=68.0, nuc_diam=15.0):
 
-        self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam)
+        if self.cp_labcells is None:
+            self.segmentCell(celldiam=cell_diam, nucdiam=nuc_diam)
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
         woundarea = remove_small_objects(
             ~cellarea, min_size=self._celldiam**2
         )
+        # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
         # remove cells touching the border
@@ -148,48 +197,120 @@ class ImageField:
         rgb_img[cell_boundaries, 0] = 1.0
         rgb_img[cell_boundaries, 1] = 1.0
         rgb_img[nuc_boundaries, 2] = 1.0
+        rgb_img[self.woundedge, 0] = 1.0
 
         return rgb_img
 
     def edge_cells(self):
+        """iterator function that yields edge cells
+
+        Each iteration yields ROI-cropped data:
+        raw data, cytoplasm mask, wound edge, nucleus mask
+
+        """
+
         # resize labels and wound edge
-        labcells = resize(
-            self.labcells,
-            (self.Ny, self.Nx),
-            order=0,
-            preserve_range=True,
-            anti_aliasing=False,
-        )
-        labnucs = resize(
-            self.labnucs,
-            (self.Ny, self.Nx),
-            order=0,
-            preserve_range=True,
-            anti_aliasing=False,
-        )
-        woundedge = resize(self.woundedge, (self.Ny, self.Nx))
-        Ncells = int(labcells.max())
+        Ncells = int(self.labcells.max())
 
         for i in range(1, Ncells + 1):
-            cell_mask = labcells == i
-            cell_wound = cell_mask * woundedge
+            # clean up cell_mask
+            cell_mask = binary_closing(self.labcells == i)
+            cell_wound = skeletonize(cell_mask * self.woundedge)
             on_edge = np.sum(cell_wound) > 0
+
+            # rescale boxes images
+            cell_mask = _rescale_mask(cell_mask, 1 / self.downscale_factor)
+            cell_wound = _rescale_mask(cell_wound, 1 / self.downscale_factor)
+            cell_nucs = _rescale_mask(self.labnucs, 1 / self.downscale_factor)
 
             if on_edge:
                 rmin, rmax, cmin, cmax = bbox2(cell_mask)
                 ri = rmin - 2
-                rf = rmax + 2
+                rf = rmax + 3
                 ci = cmin - 2
-                cf = cmax + 2
+                cf = cmax + 3
                 # pad edges
                 mask_ = cell_mask[ri:rf, ci:cf]
                 data_ = self.data[ri:rf, ci:cf] * cell_mask[ri:rf, ci:cf, None]
                 wound_ = cell_wound[ri:rf, ci:cf]
-                nuc_ = labnucs[ri:rf, ci:cf] > 0
-                yield data_, mask_, wound_, nuc_
+                nuc_ = cell_nucs[ri:rf, ci:cf]
+                yield i, data_, mask_, nuc_, wound_
+            else:
+                pass
+
+    def _masks(self):
+        """iterator which returns sampled-down masks"""
+        Ncells = int(self.labcells.max())
+        for i in range(1, Ncells + 1):
+            cell_mask = self.labcells == i
+            cell_wound = cell_mask * self.woundedge
+            on_edge = np.sum(cell_wound) > 0
+            if on_edge:
+                rmin, rmax, cmin, cmax = bbox2(cell_mask)
+                ri = rmin - 2
+                rf = rmax + 3
+                ci = cmin - 2
+                cf = cmax + 3
+                mask_ = cell_mask[ri:rf, ci:cf]
+                nuc_ = (self.labnucs[ri:rf, ci:cf] > 0) * cell_mask[
+                    ri:rf, ci:cf
+                ]
+                cell_boundary = trace_object_boundary(cell_mask[ri:rf, ci:cf])
+                wound_ = skeletonize(
+                    cell_boundary & self.woundedge[ri:rf, ci:cf]
+                )
+
+                yield i, mask_, nuc_, wound_
+            else:
+                pass
 
 
 class Cell:
+    def __init__(self, cell_id, data, cytomask, nucmask):
+        self.id = cell_id
+        self.data = data
+        self.cytomask = cytomask
+        self.nucmask = nucmask
+
+    def compute_basic_properties(self):
+        self.cellprops = regionprops(self.cytoplasm_mask)
+        self.nucprops = regionprops(self.nucleus_mask)
+
+    @property
+    def nucleus_centroid(self):
+        nucy, nucx = regionprops(self.nucleus_mask)[0].centroid
+        return nucy, nucx
+
+
+class EdgeCell(Cell):
+    def __init__(self, cell_id, data, cytomask, nucmask, woundedge):
+        super().__init__(cell_id, data, cytomask, nucmask)
+        self.woundedge = woundedge
+        self.single_edge_uint8 = np.uint8(skeletonize(self.woundedge))
+        self.edge_endpts = None
+        self.endpoints_computed = False
+
+    @property
+    def edge_endpoints(self):
+        if not self.endpoints_computed:
+            endpt_response = convolve(self.single_edge_uint8, endpt_kernel)
+            yends, xends = np.where(endpt_response == 11)
+            Nends = len(yends)
+            errmsg = "There can only be 2 endpoints! Found {Nends:d}. "
+            errmsg += "Cell {id:d} in {folder:s}."
+            assert Nends == 2, errmsg.format(Nends=Nends, id=self.id)
+            endpt1 = (yends[0], xends[0])
+            endpt2 = (yends[1], xends[1])
+
+            self.edge_endpts = (endpt1, endpt2)
+            self.endpoints_computed = True
+
+            return endpt1, endpt2
+        else:
+            return self.edge_endpts
+
+
+class _Cell__old:
     """an abstract cell representation
 
     Each cell contains its:
@@ -797,40 +918,68 @@ def find_2d_spots(img):
         return true_locs
 
 
-def sort_edge_coords(single_pixel_edge_mask, endpt):
-    """returns sorted edge coordinates (y,x)
+def sort_edge_coords(skeletonized_edge, endpoint):
+    """routine to sort y,x coordinates of skeletonized edge
 
     Args:
-        single_pixel_edge_mask (bool nd.array): skeletonized wound edge mask
-        endpt (2-tuple of int): endpoint coordinate (y,x)
+        skeletonized_edge (2-d bool array): skeletonized edge image
+        endpoint (2-tuple of y,x): endpoint coordinate
 
     Returns:
-        N x 2 array (y,x) coordinate of the wound edge
+        2-d array (N x 2), rc coordinate
 
     """
 
-    edgecoords = np.array(np.where(single_pixel_edge_mask)).T
-    # setup working variables
-    wrk_edgecoords = np.copy(edgecoords)
-    wrk_pos = np.array(endpt)
-    ordered_edge_coords = []
-    root2 = np.sqrt(2.0)
+    ydir = np.array([[-1, -1, -1], [0, 0, 0], [1, 1, 1]])
+    xdir = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]])
+    pos = np.array(endpoint)
 
-    while wrk_edgecoords.shape[0] > 1:
+    numel = skeletonized_edge.sum()
 
-        distmat = np.linalg.norm(
-            wrk_edgecoords[:, None, :] - wrk_pos[None, :], axis=-1
-        ).squeeze()
-        _id = np.argwhere(distmat == distmat.min())[0][0]
-        ordered_edge_coords.append(wrk_edgecoords[_id, :])
+    wrkimg = skeletonized_edge.copy()
 
-        # identify neighbor, first remove current position from entry
-        distmat[_id] = 0
-        _next_id = np.argwhere((distmat > 0) & (distmat <= root2))
-        wrk_pos = wrk_edgecoords[_next_id, :]
-        wrk_edgecoords = np.delete(wrk_edgecoords, _id, axis=0)
+    # preallocate output array
+    sorted_edge = np.zeros((numel, 2), dtype=int)
 
-    return np.array(ordered_edge_coords)
+    curpos = pos.copy()
+    sorted_edge[0, :] = curpos
+    # define pixel counter and start loop
+    i = 0
+
+    while True:
+        i += 1
+        wrkimg[curpos[0], curpos[1]] = 0
+        sbox = wrkimg[
+            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
+        ]
+        if sbox.sum() == 0:
+            break
+        # move current position
+        curpos[0] += ydir[sbox][0]
+        curpos[1] += xdir[sbox][0]
+        sorted_edge[i, :] = curpos
+
+    return sorted_edge
+
+
+def find_endpoints(edgeimg, debug=True):
+    """finds endpoints of a skeletonized edge
+
+    Usage:
+        e1, e2 = find_endpoints(skeletonize(wound_edge))
+
+    Returns:
+        list of vector (y,x) for each endpoint
+
+    """
+    endpt_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
+    endpt_response = convolve(edgeimg.astype(np.uint8), endpt_kernel)
+    endpts = np.where(endpt_response == 11)
+
+    if debug:
+        return endpt_response
+    else:
+        return [np.array(e) for e in list(zip(*endpts))]
 
 
 def trace_object_boundary(bwimg):
@@ -933,3 +1082,61 @@ def normalize(img):
 
 def norm_to_8bit(img):
     return np.uint8(normalize(img) * 255)
+
+
+def __get_last_coordinates(dict_endpoints):
+    N = len(dict_endpoints.keys())
+    return np.array([dict_endpoints[i][-1] for i in range(N)])
+
+
+endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
+
+
+def __find_endpoints(img):
+    endpt_response = convolve(img.astype(np.uint8), endpoint_kernel)
+    endpts = np.where(endpt_response == 11)
+    return endpts
+
+
+def trim_skeleton_to_endpoints(skelimg, n_ends=2):
+
+    epts = __find_endpoints(skelimg)
+    dict_eps = {i: [pt] for i, pt in enumerate(list(zip(*epts)))}
+    wrk = skelimg.copy()
+
+    if len(epts[0]) == n_ends:
+        epts = tuple(zip(*epts))
+        return skelimg, epts
+
+    else:
+        while len(epts[0]) > n_ends:
+            wrk[epts] = 0
+            a1 = __get_last_coordinates(dict_eps)
+            epts = __find_endpoints(wrk)
+            a2 = np.array(epts).T
+            pwdist = cdist(a1, a2)
+            eid_ = pwdist.argmin(axis=0)
+            for id_, yx in zip(eid_, a2):
+                dict_eps[id_].append((yx[0], yx[1]))
+
+        # flatten the list of coordinates
+        survived_ends = list(chain(*[dict_eps[i] for i in eid_]))
+        survived_ends_id = tuple(i for i in np.array(survived_ends).T)
+
+        # re-fill erased skeleton pixels
+        wrk[survived_ends_id] = 1
+
+        survived_epts = tuple([dict_eps[i][0] for i in eid_])
+        return wrk, survived_epts
+
+
+def _rescale_mask(img, scale):
+    Ly = int(scale * img.shape[0])
+    Lx = int(scale * img.shape[1])
+    if img.dtype == "bool":
+        out = cv2.resize(img.astype(np.float32), (Lx, Ly), interpolation=cv2.INTER_LINEAR)
+        return (out > 0).astype(img.dtype)
+    elif img.dtype == "int":
+        # used for resizing labeled masks
+        out = cv2.resize(img, (Lx, Ly), interpolation=cv2.INTER_NEAREST)
+        return out

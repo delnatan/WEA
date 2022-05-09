@@ -300,3 +300,70 @@ def visualize_canonized_alignment(ax, cell):
     oriy, orix = cell.nucleus_centroid
     maxis = cell.compute_migration_axis()
     rgbcomp = cell.composite_with_edge()
+
+
+def make_img_montage(imglist, ncol=5, pad=4):
+
+    isizes = tuple(zip(*[i.shape for i in imglist]))
+
+    rmax = max(isizes[0])
+    cmax = max(isizes[1])
+
+    Ncols = min(ncol, len(imglist))
+    Nrows = (len(imglist) // ncol) + (len(imglist) % ncol)
+
+    montage_rowsize = Nrows * rmax + pad * (Nrows + 1)
+    montage_colsize = Ncols * cmax + pad * (Ncols + 1)
+
+    is_color_image = len(isizes) == 3
+
+    if is_color_image:
+        montage_size = (montage_rowsize, montage_colsize, 3)
+    else:
+        montage_size = (montage_rowsize, montage_colsize)
+
+    montage = np.ones(montage_size, dtype=imglist[0].dtype)
+
+    for i, im in enumerate(imglist):
+
+        r_ = i // Ncols
+        c_ = i % Ncols
+
+        if rmax % 2 == 0:
+            roffset = 0
+        else:
+            roffset = 1
+
+        if cmax % 2 == 0:
+            coffset = 0
+        else:
+            coffset = 1
+
+        # image center in montage frame
+        rc = (rmax + pad) * r_ + (rmax // 2 + roffset) + pad
+        cc = (cmax + pad) * c_ + (cmax // 2 + coffset) + pad
+
+        Ny, Nx = im.shape[0:2]
+
+        if Ny % 2 == 0:
+            yoffset = 0
+        else:
+            yoffset = 1
+
+        if Nx % 2 == 0:
+            xoffset = 0
+        else:
+            xoffset = 1
+
+        ri = rc - (Ny // 2) - yoffset
+        rf = rc + (Ny // 2)
+
+        ci = cc - (Nx // 2) - xoffset
+        cf = cc + (Nx // 2)
+
+        if is_color_image:
+            montage[ri:rf, ci:cf, :] = im
+        else:
+            montage[ri:rf, ci:cf] = im
+
+    return montage

@@ -39,8 +39,6 @@ import pandas as pd
 from .vis import makeRGBComposite, drawSegmentationBorder
 from . import __file__
 
-logging.basicConfig(filename="WEA_dev.log", filemode="w", level=logging.DEBUG)
-
 
 if torch.cuda.is_available():
     use_gpu = True
@@ -48,7 +46,12 @@ else:
     use_gpu = False
 
 
-__model_dir = Path(__file__).parent
+__module_dir = Path(__file__).parent
+__model_dir = __module_dir / "models"
+
+logging.basicConfig(
+    filename=f"{__module_dir / 'WEA_dev.log'}", filemode="w", level=logging.DEBUG
+)
 
 
 # custom models are stored in $HOME/.cellpose/models
@@ -59,6 +62,9 @@ cytoengine = models.CellposeModel(
 nucengine = models.CellposeModel(
     gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
 )
+
+
+logging.info(f"Using models from {str(__model_dir)}")
 
 
 endpt_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.float64)
@@ -128,7 +134,7 @@ class ImageField:
             scaled_dxy = self.dxy / downscale_factor
         else:
             img = self.data.astype(np.float32)
-            scaled_dxy = 1.0
+            scaled_dxy = self.dxy
 
         # create RGB input
         Ny, Nx = img.shape[0:2]
@@ -138,7 +144,7 @@ class ImageField:
 
         return cp_input, scaled_dxy
 
-    def segment_cells(self, celldiam=68.0, nucdiam=14.0):
+    def segment_cells(self, celldiam=68.0, nucdiam=14.0, downsize=True):
         """resizes images to about 512x512 and run cellpose
 
         These defaults have been acquired from working with 3T3 cells. You
@@ -153,7 +159,9 @@ class ImageField:
 
         unscaled_cell_diam = celldiam / self.dxy
 
-        img, scaled_dxy = self._create_cellpose_input(unscaled_cell_diam)
+        img, scaled_dxy = self._create_cellpose_input(
+            unscaled_cell_diam, downsize=downsize
+        )
 
         self._celldiam = celldiam / scaled_dxy
         self._nucdiam = nucdiam / scaled_dxy
@@ -163,11 +171,7 @@ class ImageField:
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img,
-            diameter=self._nucdiam,
-            resample=True,
-            channels=[3, 0],
-            compute_masks=True,
+            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -184,10 +188,12 @@ class ImageField:
         self._cyt_cellprob = cflow[2]
         self.cp_labnucs = nmask
 
-    def run_detection(self, cell_diam=68.0, nuc_diam=15.0):
+    def run_detection(self, cell_diam=68.0, nuc_diam=15.0, downsize=True):
 
         if self.cp_labcells is None:
-            self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam)
+            self.segment_cells(
+                celldiam=cell_diam, nucdiam=nuc_diam, downsize=downsize
+            )
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
@@ -237,7 +243,8 @@ class ImageField:
                 _rescale_mask(self.labnucs, 1 / self.downscale_factor),
                 disk_radius=nucleus_erosion_radius,
             )
-            cell_nucs = remove_small_objects(cell_nucs, 64)
+
+            # cell_nucs = remove_small_objects(cell_nucs, 64)
 
             if on_edge:
                 rmin, rmax, cmin, cmax = bbox2(cell_mask)

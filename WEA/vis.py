@@ -371,12 +371,15 @@ def cartesian_to_polar(x, y):
     return np.array([theta, radius])
 
 
-def polar_histogram(data, color="C1", density=False, bin_increment=10):
+def polar_histogram(data, color="C1", density=False, bin_increment=10, label=None, ax=None):
 
     orientation_bins = np.linspace(-180, 180, num=(360 // bin_increment) + 1)
     counts, bins = np.histogram(data, bins=orientation_bins, density=density)
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={"projection": "polar"})
+    if ax is None:
+        fig, ax = plt.subplots(
+            figsize=(6, 6), subplot_kw={"projection": "polar"}
+        )
 
     ax.set_theta_direction(-1)
     ax.set_theta_zero_location("N")
@@ -395,6 +398,7 @@ def polar_histogram(data, color="C1", density=False, bin_increment=10):
         alpha=0.5,
         ec=color,
         linewidth=0.5,
+        label=label
     )
 
     # theta ticks
@@ -454,12 +458,12 @@ def polar_histogram(data, color="C1", density=False, bin_increment=10):
             rotation=-i,
             rotation_mode="anchor",
             ha="center",
-            size="large",
+            size="medium",
         )
 
     for i in range(-180, 180, 90):
         angle = np.pi * i / 180
-        plt.plot(
+        ax.plot(
             [angle, angle],
             [radius, ax.get_rmin()],
             zorder=500,
@@ -467,4 +471,5 @@ def polar_histogram(data, color="C1", density=False, bin_increment=10):
             color="0.0",
         )
 
-    return fig, ax
+    if ax is None:
+        return fig, ax

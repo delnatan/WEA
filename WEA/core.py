@@ -11,7 +11,6 @@ import cv2
 from pathlib import Path
 from cellpose import models
 from scipy.ndimage import (
-    maximum_filter,
     convolve,
     binary_fill_holes,
     binary_closing,
@@ -19,24 +18,20 @@ from scipy.ndimage import (
 from scipy.spatial.distance import cdist
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.measure import label, regionprops
-from skimage.io import imsave, imread
+from skimage.io import imread
 from skimage.transform import rescale
 from skimage.feature import peak_local_max
 from skimage.morphology import (
     convex_hull_image,
     remove_small_objects,
-    binary_dilation,
     binary_erosion,
-    binary_opening,
     disk,
     skeletonize,
 )
 from itertools import chain
-from pathlib import Path
-import matplotlib.pyplot as plt
 import pandas as pd
 
-from .vis import makeRGBComposite, drawSegmentationBorder
+from .vis import makeRGBComposite
 from . import __file__
 
 
@@ -50,13 +45,16 @@ __module_dir = Path(__file__).parent
 __model_dir = __module_dir / "models"
 
 logging.basicConfig(
-    filename=f"{__module_dir / 'WEA_dev.log'}", filemode="w", level=logging.DEBUG
+    filename=f"{__module_dir / 'WEA_dev.log'}",
+    filemode="w",
+    level=logging.DEBUG,
 )
 
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
+    gpu=use_gpu,
+    pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
 )
 
 nucengine = models.CellposeModel(
@@ -104,7 +102,9 @@ def erode_labels(img, disk_radius=2):
 
 
 class ImageField:
-    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
+    def __init__(
+        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
+    ):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -167,11 +167,17 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img, diameter=self._celldiam, resample=True, channels=[2, 3],
+            img,
+            diameter=self._celldiam,
+            resample=True,
+            channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
+            img,
+            diameter=self._nucdiam,
+            resample=True,
+            channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -197,7 +203,9 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
+        woundarea = remove_small_objects(
+            ~cellarea, min_size=self._celldiam**2
+        )
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -329,7 +337,10 @@ class Cell:
 
     def get_mtoc_locs(self, channel=1):
         p = peak_local_max(
-            self.data[:, :, channel], num_peaks=8, min_distance=3, threshold_rel=0.6
+            self.data[:, :, channel],
+            num_peaks=8,
+            min_distance=3,
+            threshold_rel=0.6,
         )
         return p
 
@@ -350,7 +361,9 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
+        maxis_index = int(
+            np.sum(np.arange(self.distweights.size) * normweights)
+        )
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -382,7 +395,9 @@ class _Cell__old:
     """
 
     def __init__(
-        self, folder, num,
+        self,
+        folder,
+        num,
     ):
         self.root = Path(folder)
         cell_ptn = "cell_{:d}.tif"
@@ -396,7 +411,9 @@ class _Cell__old:
         self.nucleus_mask = imread(self.root / nucmask_ptn.format(num))
 
         # shrink the nucleus a bit to compensate for 'cyto' model mask
-        self.nucleus_mask = np.uint8(binary_erosion(self.nucleus_mask > 0, disk(10)))
+        self.nucleus_mask = np.uint8(
+            binary_erosion(self.nucleus_mask > 0, disk(10))
+        )
 
         edge = self.root.stem == "edge"
         self.endpoints_computed = False
@@ -610,7 +627,9 @@ class _Cell__old:
             mtoc_vector = mtoc[0] - origin
             relative_theta = relative_angle(mtoc_vector, migration_vector)
             # re-append the rest of the metadata about mtoc
-            mtocs_out.append((np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3]))
+            mtocs_out.append(
+                (np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3])
+            )
 
         return mtocs_out
 
@@ -665,7 +684,9 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
+        sbox = wrkimg[
+            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
+        ]
         if sbox.sum() == 0:
             break
         # move current position
@@ -685,7 +706,9 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
+    return np.arctan2(
+        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
+    )
 
 
 def get_indexer(img, ch_axis, ch_slice):

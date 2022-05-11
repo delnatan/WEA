@@ -7,6 +7,8 @@ from matplotlib.colors import (
     hsv_to_rgb,
     LinearSegmentedColormap,
 )
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 from skimage.morphology import binary_erosion, binary_dilation, disk
 from scipy.ndimage import map_coordinates, rotate
 from colorcet import gouldian
@@ -100,7 +102,9 @@ def makeRGBComposite(
         hi = clip_high
 
     assert len(ch_hues) == Nch, "Number of channels must match given hues"
-    assert len(ch_sats) == Nch, "Number of channels must match given saturations"
+    assert (
+        len(ch_sats) == Nch
+    ), "Number of channels must match given saturations"
 
     # normalize hues & saturation so that [0,1]
     schues = [c / 360.0 for c in ch_hues]
@@ -148,7 +152,12 @@ def makeRGBComposite(
 
 
 def drawSegmentationBorder(
-    rgbimg, labels, border_hue=0.0, border_sat=1.0, thickness=1, already_edge=False,
+    rgbimg,
+    labels,
+    border_hue=0.0,
+    border_sat=1.0,
+    thickness=1,
+    already_edge=False,
 ):
     """draw segmentation result as a border"""
     Nlabels = labels.max()
@@ -211,7 +220,9 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
         [[0, 0], [0, img2d.shape[-2]], [0, img2d.shape[-1]], img2d.shape[-2:]]
     )
     # compute distance from corners to the given origin
-    cornerdists = np.sqrt(np.sum((corners - np.array([oriy, orix])) ** 2, axis=1))
+    cornerdists = np.sqrt(
+        np.sum((corners - np.array([oriy, orix])) ** 2, axis=1)
+    )
     rmax = np.ceil(cornerdists.max())
     # setup radial vectors
     radvec = np.arange(rmax)
@@ -225,9 +236,9 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
     Nrads = radvec.size
     Nthetas = n_thetas
     yxvec = np.vstack([yvec.ravel(), xvec.ravel()])
-    resampled = map_coordinates(img2d, yxvec, cval=0.0, prefilter=False).reshape(
-        (Nrads, Nthetas)
-    )
+    resampled = map_coordinates(
+        img2d, yxvec, cval=0.0, prefilter=False
+    ).reshape((Nrads, Nthetas))
 
     return resampled
 
@@ -346,3 +357,114 @@ def make_img_montage(imglist, ncol=5, pad=4):
             montage[ri:rf, ci:cf] = im
 
     return montage
+
+
+def polar_to_cartesian(theta, radius):
+    x = radius * np.cos(theta)
+    y = radius * np.sin(theta)
+    return np.array([x, y])
+
+
+def cartesian_to_polar(x, y):
+    radius = np.sqrt(x**2 + y**2)
+    theta = np.arctan2(y, x)
+    return np.array([theta, radius])
+
+
+def polar_histogram(data, color="C1", density=False, bin_increment=10):
+
+    orientation_bins = np.linspace(-180, 180, num=(360 // bin_increment) + 1)
+    counts, bins = np.histogram(data, bins=orientation_bins, density=density)
+
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={"projection": "polar"})
+
+    ax.set_theta_direction(-1)
+    ax.set_theta_zero_location("N")
+    ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_rlim(-counts.max() * 0.25, counts.max() * 1.25)
+
+    # important: theta must be in radians (despite the labels in degrees)
+    radbins = np.deg2rad(bins[:-1])
+    widths = radbins[1] - radbins[0]
+    ax.bar(
+        radbins + widths / 2,
+        counts,
+        width=widths,
+        color=color,
+        alpha=0.5,
+        ec=color,
+        linewidth=0.5,
+    )
+
+    # theta ticks
+    radius = ax.get_rmax()
+    length = 0.025 * radius
+
+    # rug plot
+    for d in data:
+        angle = np.pi * d / 180
+        ax.plot(
+            [angle, angle],
+            [radius * -0.05, radius * 0.05],
+            linewidth=1,
+            color="#444",
+            alpha=0.25,
+        )
+
+    # minor ticks
+    for i in range(360):
+        angle = np.pi * i / 180
+        ax.plot(
+            [angle, angle],
+            [radius, radius - length],
+            linewidth=0.5,
+            color="0.75",
+            clip_on=False,
+        )
+
+    # major ticks
+    for i in range(0, 360, 5):
+        angle = np.pi * i / 180
+        ax.plot(
+            [angle, angle],
+            [radius, radius - 2 * length],
+            linewidth=0.75,
+            color="0.75",
+            clip_on=False,
+        )
+
+    for i in range(-180, 180, 15):
+        angle = np.pi * i / 180
+        ax.plot([angle, angle], [radius, 100], linewidth=0.5, color="0.75")
+        ax.plot(
+            [angle, angle],
+            [radius + length, radius],
+            zorder=500,
+            linewidth=1.0,
+            color="0.00",
+            clip_on=False,
+        )
+        ax.text(
+            angle,
+            radius + 5 * length,
+            f"{i:d}˚",
+            zorder=500,
+            va="top",
+            rotation=-i,
+            rotation_mode="anchor",
+            ha="center",
+            size="large",
+        )
+
+    for i in range(-180, 180, 90):
+        angle = np.pi * i / 180
+        plt.plot(
+            [angle, angle],
+            [radius, ax.get_rmin()],
+            zorder=500,
+            linewidth=1.00,
+            color="0.0",
+        )
+
+    return fig, ax

@@ -13,5 +13,7 @@ setup(
         "scipy",
         "matplotlib",
         "mrc",
+        "pandas",
+        "nd2reader",
     ],
 )

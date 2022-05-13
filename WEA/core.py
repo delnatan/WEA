@@ -43,7 +43,7 @@ else:
 # get current module path by using the __file__ attribute
 __module_dir = Path(__file__).parent
 __model_dir = __module_dir / "models"
-__log_dir = Path("~") / "WEA_log"
+__log_dir = Path.home() / "WEA_log"
 
 if not __log_dir.exists():
     __log_dir.mkdir(exist_ok=True)
@@ -52,6 +52,8 @@ if not __log_dir.exists():
 logging.basicConfig(
     filename=f"{__log_dir / 'WEA_dev.log'}",
     filemode="w",
+    format="%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.DEBUG,
 )
 

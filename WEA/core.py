@@ -34,18 +34,23 @@ import pandas as pd
 from .vis import makeRGBComposite
 from . import __file__
 
-
+# check whether GPU is available
 if torch.cuda.is_available():
     use_gpu = True
 else:
     use_gpu = False
 
-
+# get current module path by using the __file__ attribute
 __module_dir = Path(__file__).parent
 __model_dir = __module_dir / "models"
+__log_dir = Path("~") / "WEA_log"
 
+if not __log_dir.exists():
+    __log_dir.mkdir(exist_ok=True)
+
+# setup basic logging (may change directory later)
 logging.basicConfig(
-    filename=f"{__module_dir / 'WEA_dev.log'}",
+    filename=f"{__log_dir / 'WEA_dev.log'}",
     filemode="w",
     level=logging.DEBUG,
 )

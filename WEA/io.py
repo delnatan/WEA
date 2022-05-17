@@ -62,6 +62,15 @@ class CanonizedImage:
         zid = find_focus(self.data[..., channel])
         return self.data[zid, ...]
 
+    def __str__(self):
+        str_repr = f"filename: {self.filename}\n"
+        str_repr += f"shape: {self.data.shape}\n"
+        str_repr += f"dxy: {self.dxy:0.4f} um"
+        return str_repr
+
+    def __repr__(self):
+        return self.__str__()
+
 
 def find_focus(img3d, edge=True):
     """returns index of in-focus plane

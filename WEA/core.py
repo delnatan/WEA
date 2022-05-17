@@ -60,8 +60,7 @@ logging.basicConfig(
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu,
-    pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
+    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
 )
 
 nucengine = models.CellposeModel(
@@ -109,9 +108,7 @@ def erode_labels(img, disk_radius=2):
 
 
 class ImageField:
-    def __init__(
-        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
-    ):
+    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -152,7 +149,7 @@ class ImageField:
         return cp_input, scaled_dxy
 
     def segment_cells(self, celldiam=68.0, nucdiam=14.0, downsize=True):
-        """resizes images to about 512x512 and run cellpose
+        """resizes images and run cellpose
 
         These defaults have been acquired from working with 3T3 cells. You
         should change them to suit your images
@@ -174,17 +171,11 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img,
-            diameter=self._celldiam,
-            resample=True,
-            channels=[2, 3],
+            img, diameter=self._celldiam, resample=True, channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img,
-            diameter=self._nucdiam,
-            resample=True,
-            channels=[3, 0],
+            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -210,9 +201,7 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(
-            ~cellarea, min_size=self._celldiam**2
-        )
+        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -220,12 +209,12 @@ class ImageField:
         self.labcells = label(clear_border(self.cp_labcells))
         self.labnucs = self.labcells * (self.cp_labnucs > 0)
 
-    def _segmentation_result(self):
+    def _segmentation_result(self, **kwargs):
 
         cell_boundaries = find_boundaries(self.labcells, mode="thin")
         nuc_boundaries = find_boundaries(self.labnucs, mode="thin")
 
-        rgb_img = makeRGBComposite(self.cp_input, ch_axis=-1)
+        rgb_img = makeRGBComposite(self.cp_input, ch_axis=-1, **kwargs)
 
         rgb_img[cell_boundaries, 0] = 1.0
         rgb_img[cell_boundaries, 1] = 1.0
@@ -259,30 +248,83 @@ class ImageField:
                 disk_radius=nucleus_erosion_radius,
             )
 
-            # cell_nucs = remove_small_objects(cell_nucs, 64)
-
             if on_edge:
                 rmin, rmax, cmin, cmax = bbox2(cell_mask)
                 ri = rmin - 2
                 rf = rmax + 3
                 ci = cmin - 2
                 cf = cmax + 3
+                # bounding box center for reference
+                centroid = (ri, ci)
                 # pad edges
                 mask_ = cell_mask[ri:rf, ci:cf]
                 data_ = self.data[ri:rf, ci:cf] * cell_mask[ri:rf, ci:cf, None]
                 wound_ = cell_wound[ri:rf, ci:cf]
                 nuc_ = label(cell_nucs[ri:rf, ci:cf] * cell_mask[ri:rf, ci:cf])
-                yield i, data_, mask_, nuc_, wound_
+                yield i, data_, mask_, nuc_, wound_, centroid
             else:
                 pass
 
     def run_analysis(self, img_tag):
+        # for mtoc stats
         datacol = []
+        # for cell stats
+        cellcol = []
 
-        for i, d, m, n, w in self.edge_cells(nucleus_erosion_radius=5):
+        for i, d, m, n, w, yxoffset in self.edge_cells(nucleus_erosion_radius=5):
             ec = EdgeCell(i, d, m, n, w)
+            celly, cellx = ec.cellprops[0].centroid
+
+            if ec.nuclei_num == 1:
+                oy, ox = ec.nucleus_centroid
+            elif ec.nuclei_num > 2:
+                logging.info(
+                    f"Cell {i:d} in {img_tag} has {ec.nuclei_num} nuclei. Skipping this cell"
+                )
+                continue
+            elif ec.nuclei_num == 0:
+                logging.info(
+                    f"Cell {i:d} in {img_tag} has no detected nuclei. Skipping this cell"
+                )
+                continue
+
+            # compute orientation
             p, tub_ints, oris = ec.get_mtoc_orientation()
-            oy, ox = ec.nucleus_centroid
+
+            # compute nucleus orientation
+            nori = ec.nucprops[0].orientation
+            nucmajlength = ec.nucprops[0].axis_major_length
+            nucminlength = ec.nucprops[0].axis_minor_length
+            nucy_major = np.cos(nori) * nucmajlength / 2.0
+            nucx_major = np.sin(nori) * nucmajlength / 2.0
+            nucy_minor = np.sin(nori) * nucminlength / 2.0
+            nucx_minor = np.cos(nori) * nucminlength / 2.0
+
+            nori_ma = relative_angle(ec.ma, (nucy_major, nucx_major))
+
+            # after orientation is computed, we can access '.ma' attribute
+            # which is for 'migration axis'
+            cellentry = {
+                "Cell #": i,
+                "cell_x": celly + yxoffset[1],
+                "cell_y": cellx + yxoffset[0],
+                "migration_x": ec.ma[1] + ox + yxoffset[1],
+                "migration_y": ec.ma[0] + oy + yxoffset[0],
+                "wound_length": ec.single_edge.sum() * self.dxy,
+                "cell_perimeter": ec.cellprops[0].perimeter * self.dxy,
+                "equivalent_diameter": ec.cellprops[0].equivalent_diameter_area
+                * self.dxy,
+                "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area
+                * self.dxy,
+                "nucleus_orientation": np.rad2deg(nori_ma),
+                "nucleus_x": ox + yxoffset[1],
+                "nucleus_y": oy + yxoffset[0],
+                "nucleus_major_axis_x": ox - nucx_major + yxoffset[1],
+                "nucleus_major_axis_y": oy - nucy_major + yxoffset[0],
+                "nucleus_minor_axis_x": ox + nucx_minor + yxoffset[1],
+                "nucleus_minor_axis_y": oy - nucy_minor + yxoffset[0],
+            }
+            cellcol.append(cellentry)
 
             # form convex hull of the cell "front"
             _img = ec.single_edge
@@ -293,26 +335,28 @@ class ImageField:
                 on_nucleus = n[mtoc_loc[0], mtoc_loc[1]]
                 entry = {
                     "Cell #": i,
-                    "mtoc_x": mtoc_loc[1],
-                    "mtoc_y": mtoc_loc[0],
                     "tubulin_intensity": tub_intensity,
                     "orientation": ori,
                     "on_nucleus": on_nucleus,
                     "classic_alignment": cone[mtoc_loc[0], mtoc_loc[1]],
+                    "x": mtoc_loc[1] + yxoffset[1],
+                    "y": mtoc_loc[0] + yxoffset[0],
                 }
                 datacol.append(entry)
 
+        # convert mtoc data into DataFrame
         df = pd.DataFrame(datacol)
-
         mother_ids = df.loc[:, "tubulin_intensity"] == df.groupby("Cell #")[
             "tubulin_intensity"
         ].transform("max")
         df.loc[:, "mtoc_identity"] = "daughter"
         df.loc[mother_ids, "mtoc_identity"] = "mother"
-
         df.insert(0, "filename", img_tag)
 
-        return df
+        df2 = pd.DataFrame(cellcol)
+        df2.insert(0, "filename", img_tag)
+
+        return df, df2
 
 
 class Cell:
@@ -344,10 +388,7 @@ class Cell:
 
     def get_mtoc_locs(self, channel=1):
         p = peak_local_max(
-            self.data[:, :, channel],
-            num_peaks=8,
-            min_distance=3,
-            threshold_rel=0.6,
+            self.data[:, :, channel], num_peaks=8, min_distance=3, threshold_rel=0.6,
         )
         return p
 
@@ -368,9 +409,7 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(
-            np.sum(np.arange(self.distweights.size) * normweights)
-        )
+        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -384,9 +423,9 @@ class EdgeCell(Cell):
 
         oy, ox = self.nucleus_centroid
         # compute angle w.r.t migration axes
-        ma = self.compute_migration_axis()
+        self.ma = self.compute_migration_axis()
         orientation = np.rad2deg(
-            np.array([relative_angle((y - oy, x - ox), ma) for y, x in p])
+            np.array([relative_angle((y - oy, x - ox), self.ma) for y, x in p])
         )
 
         return p, tub_intensities, orientation
@@ -402,9 +441,7 @@ class _Cell__old:
     """
 
     def __init__(
-        self,
-        folder,
-        num,
+        self, folder, num,
     ):
         self.root = Path(folder)
         cell_ptn = "cell_{:d}.tif"
@@ -418,9 +455,7 @@ class _Cell__old:
         self.nucleus_mask = imread(self.root / nucmask_ptn.format(num))
 
         # shrink the nucleus a bit to compensate for 'cyto' model mask
-        self.nucleus_mask = np.uint8(
-            binary_erosion(self.nucleus_mask > 0, disk(10))
-        )
+        self.nucleus_mask = np.uint8(binary_erosion(self.nucleus_mask > 0, disk(10)))
 
         edge = self.root.stem == "edge"
         self.endpoints_computed = False
@@ -634,9 +669,7 @@ class _Cell__old:
             mtoc_vector = mtoc[0] - origin
             relative_theta = relative_angle(mtoc_vector, migration_vector)
             # re-append the rest of the metadata about mtoc
-            mtocs_out.append(
-                (np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3])
-            )
+            mtocs_out.append((np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3]))
 
         return mtocs_out
 
@@ -691,9 +724,7 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[
-            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
-        ]
+        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
         if sbox.sum() == 0:
             break
         # move current position
@@ -713,9 +744,7 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(
-        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
-    )
+    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
 
 
 def get_indexer(img, ch_axis, ch_slice):

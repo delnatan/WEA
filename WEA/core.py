@@ -10,15 +10,16 @@ import cv2
 
 from pathlib import Path
 from cellpose import models
+from scipy.signal import convolve2d
 from scipy.ndimage import (
-    convolve,
     binary_fill_holes,
     binary_closing,
 )
+
+from numba import njit
 from scipy.spatial.distance import cdist
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.measure import label, regionprops
-from skimage.io import imread
 from skimage.transform import rescale
 from skimage.feature import peak_local_max
 from skimage.morphology import (
@@ -60,7 +61,8 @@ logging.basicConfig(
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
+    gpu=use_gpu,
+    pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
 )
 
 nucengine = models.CellposeModel(
@@ -108,7 +110,9 @@ def erode_labels(img, disk_radius=2):
 
 
 class ImageField:
-    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
+    def __init__(
+        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
+    ):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -171,11 +175,17 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img, diameter=self._celldiam, resample=True, channels=[2, 3],
+            img,
+            diameter=self._celldiam,
+            resample=True,
+            channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
+            img,
+            diameter=self._nucdiam,
+            resample=True,
+            channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -201,7 +211,9 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
+        woundarea = remove_small_objects(
+            ~cellarea, min_size=self._celldiam**2
+        )
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -271,7 +283,9 @@ class ImageField:
         # for cell stats
         cellcol = []
 
-        for i, d, m, n, w, yxoffset in self.edge_cells(nucleus_erosion_radius=5):
+        for i, d, m, n, w, yxoffset in self.edge_cells(
+            nucleus_erosion_radius=5
+        ):
             ec = EdgeCell(i, d, m, n, w)
             celly, cellx = ec.cellprops[0].centroid
 
@@ -388,7 +402,10 @@ class Cell:
 
     def get_mtoc_locs(self, channel=1):
         p = peak_local_max(
-            self.data[:, :, channel], num_peaks=8, min_distance=3, threshold_rel=0.6,
+            self.data[:, :, channel],
+            num_peaks=8,
+            min_distance=3,
+            threshold_rel=0.6,
         )
         return p
 
@@ -409,7 +426,9 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
+        maxis_index = int(
+            np.sum(np.arange(self.distweights.size) * normweights)
+        )
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -418,7 +437,10 @@ class EdgeCell(Cell):
         _data = self.data[:, :, tubulin_channel]
         w = tub_box // 2
         tub_intensities = np.array(
-            [_data[r - 2 : r + 3, c - 2 : c + 3].sum() for r, c in p]
+            [
+                _data[r - w : r + (w + 1), c - w : c + (w + 1)].sum()
+                for r, c in p
+            ]
         )
 
         oy, ox = self.nucleus_centroid
@@ -429,258 +451,6 @@ class EdgeCell(Cell):
         )
 
         return p, tub_intensities, orientation
-
-
-class _Cell__old:
-    """an abstract cell representation
-
-    Each cell contains its:
-        - raw data (cropped by cytoplasmic mask)
-        - cytoplasm, nucleus, and wound edge masks (if available)
-
-    """
-
-    def __init__(
-        self, folder, num,
-    ):
-        self.root = Path(folder)
-        cell_ptn = "cell_{:d}.tif"
-        cytmask_ptn = "cell_mask_{:d}.tif"
-        edgemask_ptn = "edge_mask_{:d}.tif"
-        nucmask_ptn = "nucleus_mask_{:d}.tif"
-
-        self.id = num
-        self.data = imread(self.root / cell_ptn.format(num))
-        self.cytoplasm_mask = imread(self.root / cytmask_ptn.format(num))
-        self.nucleus_mask = imread(self.root / nucmask_ptn.format(num))
-
-        # shrink the nucleus a bit to compensate for 'cyto' model mask
-        self.nucleus_mask = np.uint8(binary_erosion(self.nucleus_mask > 0, disk(10)))
-
-        edge = self.root.stem == "edge"
-        self.endpoints_computed = False
-        self.edge_endpts = None
-        self.woundedge = edge
-
-        if edge:
-            # binarize the edge mask
-            self.edge_mask = imread(self.root / edgemask_ptn.format(num)) > 0
-            # trace the boundary of the cell before producing a single-pixel edge
-            thin_cell_boundary = trace_object_boundary(self.cytoplasm_mask)
-            # convert single_edge to integer for finding endpoints later
-            self.single_edge = np.uint8(
-                skeletonize(self.edge_mask * thin_cell_boundary)
-            )
-
-        self.compute_basic_properties()
-
-    def compute_basic_properties(self):
-        self.wound_length = self.single_edge.sum()
-        self.cellprops = regionprops(self.cytoplasm_mask)
-        self.nucprops = regionprops(self.nucleus_mask)
-
-    def composite(self, z_axis=1, **kwargs):
-        if self.data.shape[z_axis] > 1:
-            # if there are more than one slices, do a max-projection
-            wrk = self.data.max(axis=z_axis)
-        elif self.data.ndim == 4:
-            # if the z dimension is a singleton
-            if self.data.shape[z_axis] == 1:
-                wrk = self.data[0, ...]
-            else:
-                # otherwise just pass the array
-                wrk = self.data
-
-        return makeRGBComposite(wrk, **kwargs)
-
-    def composite_with_edge(self, z_axis=1, **kwargs):
-        if self.woundedge:
-            wrk = self.composite(z_axis=z_axis, **kwargs)
-            wrk[self.edge_mask, 0] = 1.0
-            wrk[self.edge_mask, 1] = 1.0
-        else:
-            wrk = self.composite(z_axis=z_axis, **kwargs)
-        return wrk
-
-    @property
-    def edge_length(self):
-        if self.woundedge:
-            return self.single_edge.sum()
-        else:
-            return 0
-
-    @property
-    def edge_endpoints(self):
-        if self.woundedge:
-            if not self.endpoints_computed:
-                endpt_response = convolve(self.single_edge, endpt_kernel)
-                yends, xends = np.where(endpt_response == 11)
-                Nends = len(yends)
-                errmsg = "There can only be 2 endpoints! Found {Nends:d}. "
-                errmsg += "Cell {id:d} in {folder:s}."
-                assert Nends == 2, errmsg.format(
-                    Nends=Nends, id=self.id, folder=str(self.root)
-                )
-                endpt1 = (yends[0], xends[0])
-                endpt2 = (yends[1], xends[1])
-
-                self.edge_endpts = (endpt1, endpt2)
-                self.endpoints_computed = True
-
-                return endpt1, endpt2
-            else:
-                return self.edge_endpts
-        else:
-            return None
-
-    @property
-    def mtoc_locs(self, mtoc_channel=1, mt_channel=2):
-        # do 3d max-projection
-        if self.data.squeeze().ndim > 4:
-            wrkimg = self.data[mtoc_channel, ...].max(axis=0)
-        elif self.data.squeeze().ndim == 3:
-            idx = get_indexer()
-            wrkimg = self.data.squeeze()
-        mlocs = find_2d_spots(wrkimg)
-        if mlocs.ndim == 1:
-            return mlocs[None, :]
-        else:
-            return mlocs
-
-    @property
-    def nucleus_centroid(self):
-        nucy, nucx = regionprops(self.nucleus_mask)[0].centroid
-        return nucy, nucx
-
-    @property
-    def core_vecs(self):
-        pt1, pt2 = self.edge_endpoints
-        nucy, nucx = self.nucleus_centroid
-        e1 = np.array([pt1[0] - nucy, pt1[1] - nucx])
-        e2 = np.array([pt2[0] - nucy, pt2[1] - nucx])
-        midvec = (e1 + e2) / 2.0
-        return e1, midvec, e2
-
-    @property
-    def _hw(self):
-        # head width for drawing arrow (temporary)
-        Nr, Nc = self.data.shape[-2:]
-        _l = (Nr + Nc) / 2.0
-        return _l / 20
-
-    @property
-    def _hl(self):
-        # head length for drawing arrow (temporary)
-        Nr, Nc = self.data.shape[-2:]
-        _l = (Nr + Nc) / 2.0
-        return _l / 10
-
-    def compute_migration_axis(self):
-        """returns position of migration axis on the wound edge
-
-        computed as an 'area'-weighted direction from the nucleus centroid
-        such that larger distances along the wound edge carries more weight
-        in determining the migration axis.
-
-        Returns:
-            y,x position of along the wound edge
-        """
-        if self.woundedge:
-            end1, end2 = self.edge_endpoints
-            oriy, orix = self.nucleus_centroid
-            # sorted wound edge from an endpoint
-            swedge = sort_edge_coords(self.single_edge, end1)
-            sdists = np.linalg.norm(swedge - np.array([oriy, orix]), axis=1)
-            # compute distance from nucleus centroid as 'weights'
-            edge_weights = sdists / sdists.sum()
-            axis_id = int(np.sum(edge_weights * np.arange(sdists.size)))
-            return swedge[axis_id] - self.nucleus_centroid
-        else:
-            return None
-
-    def get_mtoc(self, tub_channel=2, aperture_radius=5):
-        """returns centrosome locations and whether its within the nucleus
-
-        'mother' vs 'daughter' is distinguished by having higher vs lower
-        microtubule intensity with a 5-pixel radius
-
-        'nuc' vs 'cyto' indicates whether the centriole is on the nucleus or
-        in the cytoplasm
-
-        Args:
-            tub_channel (int): channel for tubulin intensities
-            radius (int): radius of aperture used for integrating tubulin ch.
-
-        Returns:
-            Dictionary containing key pairs ('mother', 'nuc'/'cyto')
-            with its (y,x) coordinate
-
-        """
-
-        mtoc_locs = self.mtoc_locs
-        mt_intensities = []
-        aperture = disk(aperture_radius)
-        drow, dcol = [n // 2 for n in aperture.shape]
-        on_nucleus = []
-
-        for i, c in enumerate(mtoc_locs):
-            yc, xc = c
-            # check whether centriole is on nucleus
-            on_nucleus.append(self.nucleus_mask[yc, xc] > 0)
-            _boxed = self.data[tub_channel, ...].max(axis=0)[
-                yc - drow : yc + drow + 1, xc - dcol : xc + dcol + 1
-            ]
-            tub_intensity = (_boxed * aperture).sum()
-            mt_intensities.append(tub_intensity)
-
-        # higher intensity --> mother centriole
-        if len(mt_intensities) == 2:
-            mother_id = mt_intensities.index(max(mt_intensities))
-            daughter_id = mt_intensities.index(min(mt_intensities))
-            mid = np.array([mother_id, daughter_id])
-            return list(
-                zip(
-                    [mtoc_locs[i] for i in mid],
-                    [on_nucleus[i] for i in mid],
-                    ["mother", "daughter"],
-                    [mt_intensities[i] for i in mid],
-                )
-            )
-        else:
-            mother_id = 0
-            return [
-                (mtoc_locs[0], on_nucleus[0], "only", mt_intensities[0]),
-            ]
-
-    def get_mtoc_orientation(self):
-        migaxis = self.compute_migration_axis()
-        mtocs = self.get_mtoc()
-        origin = np.array(self.nucleus_centroid)
-
-        # normalize coordinates wrt nucleus centroid
-        migration_vector = migaxis - origin
-        mtocs_out = []
-
-        # each mtoc entry is
-        # mtoc_coordinates, on_nucleus, mother_mtoc, tubulin_intensity)
-        # (np.array, bool, str, int)
-        for mtoc in mtocs:
-            # for each mtoc, compute vector wrt nucleus centroid also
-            mtoc_vector = mtoc[0] - origin
-            relative_theta = relative_angle(mtoc_vector, migration_vector)
-            # re-append the rest of the metadata about mtoc
-            mtocs_out.append((np.rad2deg(relative_theta), mtoc[1], mtoc[2], mtoc[3]))
-
-        return mtocs_out
-
-    def get_endpoints_orientation(self):
-        origin = np.array(self.nucleus_centroid)
-        migration_vector = self.compute_migration_axis() - origin
-        endpts = self.edge_endpoints
-        endangles = [
-            relative_angle(endpt - origin, migration_vector) for endpt in endpts
-        ]
-        return [np.rad2deg(x) for x in endangles]
 
 
 def remove_small_labels(labeled_img, area_threshold=400):
@@ -724,7 +494,9 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
+        sbox = wrkimg[
+            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
+        ]
         if sbox.sum() == 0:
             break
         # move current position
@@ -744,7 +516,9 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
+    return np.arctan2(
+        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
+    )
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -789,7 +563,9 @@ endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 
 def __find_endpoints(img):
-    endpt_response = convolve(img.astype(np.uint8), endpoint_kernel)
+    endpt_response = convolve2d(
+        img.astype(np.uint8), endpoint_kernel, mode="same"
+    )
     endpts = np.where(endpt_response == 11)
     return endpts
 

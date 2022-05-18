@@ -314,7 +314,13 @@ class ImageField:
             nucy_minor = np.sin(nori) * nucminlength / 2.0
             nucx_minor = np.cos(nori) * nucminlength / 2.0
 
-            nori_ma = relative_angle(ec.ma, (nucy_major, nucx_major))
+            # nori_ma = relative_angle(ec.ma, (nucy_major, nucx_major))
+            # use cosine convention to measure nucleus orientation (due to
+            # 2 2-fold symmetry axes, we only need 0 to pi)
+            norm_ma = ec.ma / np.linalg.norm(ec.ma)
+            major_nucvec = np.array([nucy_major, nucx_major])
+            norm_nuc = major_nucvec / np.linalg.norm(major_nucvec)
+            nori_ma = np.arccos(np.dot(norm_ma, norm_nuc))
 
             # after orientation is computed, we can access '.ma' attribute
             # which is for 'migration axis'
@@ -330,7 +336,7 @@ class ImageField:
                 * self.dxy,
                 "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area
                 * self.dxy,
-                "nucleus_orientation": np.rad2deg(nori_ma),
+                "nucleus_orientation": 180 - np.rad2deg(nori_ma),
                 "nucleus_x": ox + yxoffset[1],
                 "nucleus_y": oy + yxoffset[0],
                 "nucleus_major_axis_x": ox - nucx_major + yxoffset[1],

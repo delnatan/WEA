@@ -371,7 +371,9 @@ def cartesian_to_polar(x, y):
     return np.array([theta, radius])
 
 
-def polar_histogram(data, color="C1", density=False, bin_increment=10, label=None, ax=None):
+def polar_histogram(
+    data, color="C1", density=False, bin_increment=10, label=None, ax=None
+):
 
     orientation_bins = np.linspace(-180, 180, num=(360 // bin_increment) + 1)
     counts, bins = np.histogram(data, bins=orientation_bins, density=density)
@@ -398,7 +400,7 @@ def polar_histogram(data, color="C1", density=False, bin_increment=10, label=Non
         alpha=0.5,
         ec=color,
         linewidth=0.5,
-        label=label
+        label=label,
     )
 
     # theta ticks
@@ -473,3 +475,59 @@ def polar_histogram(data, color="C1", density=False, bin_increment=10, label=Non
 
     if ax is None:
         return fig, ax
+
+
+def view_in_napari(imgfield, napari_viewer, mtoc_df, cell_df):
+    ch_orders = (imgfield.nuc_ch, imgfield.tub_ch, imgfield.cyt_ch)
+    cmaps = ("cyan", "magenta", "green")
+    ch_chmaps = [cmaps[i] for i in ch_orders]
+    ch_names = ("nucleus", "tubulin", "mtoc/pericentrin")
+
+    napari_viewer.add_image(
+        imgfield.data,
+        channel_axis=-1,
+        colormap=ch_chmaps,
+        name=[ch_names[i] for i in ch_orders],
+    )
+
+    motherdf = mtoc_df[mtoc_df["mtoc_identity"] == "mother"]
+    ma_pts = [
+        row[["nucleus_y", "nucleus_x", "migration_y", "migration_x"]]
+        .values.reshape(2, 2)
+        .astype(float)
+        for i, row in cell_df.iterrows()
+    ]
+    nucmaj_pts = [
+        row[
+            [
+                "nucleus_y",
+                "nucleus_x",
+                "nucleus_major_axis_y",
+                "nucleus_major_axis_x",
+            ]
+        ]
+        .values.reshape(2, 2)
+        .astype(float)
+        for i, row in cell_df.iterrows()
+    ]
+    napari_viewer.add_points(
+        motherdf[["y", "x"]].values, size=10, edge_color="green"
+    )
+
+    napari_viewer.add_shapes(
+        ma_pts,
+        shape_type="line",
+        name="migration axis",
+        edge_width=5,
+        edge_color="red",
+        face_color="red",
+    )
+
+    napari_viewer.add_shapes(
+        nucmaj_pts,
+        name="nucleus axis",
+        shape_type="line",
+        edge_width=4,
+        edge_color="cyan",
+        face_color="cyan",
+    )

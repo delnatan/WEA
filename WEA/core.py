@@ -61,7 +61,7 @@ logging.basicConfig(
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
+    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
 )
 
 nucengine = models.CellposeModel(

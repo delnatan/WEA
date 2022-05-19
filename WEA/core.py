@@ -61,8 +61,7 @@ logging.basicConfig(
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu,
-    pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
+    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v01"),
 )
 
 nucengine = models.CellposeModel(
@@ -110,9 +109,7 @@ def erode_labels(img, disk_radius=2):
 
 
 class ImageField:
-    def __init__(
-        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
-    ):
+    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -147,6 +144,7 @@ class ImageField:
         # create RGB input
         Ny, Nx = img.shape[0:2]
         cp_input = np.zeros(img.shape[0:2] + (3,), dtype=np.float32)
+        cp_input[:, :, 0] = img[:, :, self.tub_ch]
         cp_input[:, :, 1] = img[:, :, self.cyt_ch]
         cp_input[:, :, 2] = img[:, :, self.nuc_ch]
 
@@ -175,17 +173,11 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img,
-            diameter=self._celldiam,
-            resample=True,
-            channels=[2, 3],
+            img, diameter=self._celldiam, resample=True, channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img,
-            diameter=self._nucdiam,
-            resample=True,
-            channels=[3, 0],
+            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -211,9 +203,7 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(
-            ~cellarea, min_size=self._celldiam**2
-        )
+        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -283,9 +273,7 @@ class ImageField:
         # for cell stats
         cellcol = []
 
-        for i, d, m, n, w, yxoffset in self.edge_cells(
-            nucleus_erosion_radius=5
-        ):
+        for i, d, m, n, w, yxoffset in self.edge_cells(nucleus_erosion_radius=5):
             ec = EdgeCell(i, d, m, n, w)
             celly, cellx = ec.cellprops[0].centroid
 
@@ -409,10 +397,7 @@ class Cell:
 
     def get_mtoc_locs(self, channel=1):
         p = peak_local_max(
-            self.data[:, :, channel],
-            num_peaks=8,
-            min_distance=3,
-            threshold_rel=0.6,
+            self.data[:, :, channel], num_peaks=8, min_distance=3, threshold_rel=0.6,
         )
         return p
 
@@ -433,9 +418,7 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(
-            np.sum(np.arange(self.distweights.size) * normweights)
-        )
+        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -444,10 +427,7 @@ class EdgeCell(Cell):
         _data = self.data[:, :, tubulin_channel]
         w = tub_box // 2
         tub_intensities = np.array(
-            [
-                _data[r - w : r + (w + 1), c - w : c + (w + 1)].sum()
-                for r, c in p
-            ]
+            [_data[r - w : r + (w + 1), c - w : c + (w + 1)].sum() for r, c in p]
         )
 
         oy, ox = self.nucleus_centroid
@@ -501,9 +481,7 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[
-            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
-        ]
+        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
         if sbox.sum() == 0:
             break
         # move current position
@@ -523,9 +501,7 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(
-        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
-    )
+    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -570,9 +546,7 @@ endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 
 def __find_endpoints(img):
-    endpt_response = convolve2d(
-        img.astype(np.uint8), endpoint_kernel, mode="same"
-    )
+    endpt_response = convolve2d(img.astype(np.uint8), endpoint_kernel, mode="same")
     endpts = np.where(endpt_response == 11)
     return endpts
 

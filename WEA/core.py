@@ -291,7 +291,7 @@ class ImageField:
 
             if ec.nuclei_num == 1:
                 oy, ox = ec.nucleus_centroid
-            elif ec.nuclei_num > 2:
+            elif ec.nuclei_num >= 2:
                 logging.info(
                     f"Cell {i:d} in {img_tag} has {ec.nuclei_num} nuclei. Skipping this cell"
                 )
@@ -316,14 +316,15 @@ class ImageField:
 
             # nori_ma = relative_angle(ec.ma, (nucy_major, nucx_major))
             # use cosine convention to measure nucleus orientation (due to
-            # 2 2-fold symmetry axes, we only need 0 to pi)
+            # 2 2-fold symmetry axes, we only need 0 to pi/2.
             norm_ma = ec.ma / np.linalg.norm(ec.ma)
             major_nucvec = np.array([nucy_major, nucx_major])
             norm_nuc = major_nucvec / np.linalg.norm(major_nucvec)
-            nori_ma = np.arccos(np.dot(norm_ma, norm_nuc))
+            nori_ma = np.abs(np.arccos(np.dot(norm_ma, norm_nuc))) % np.pi / 2
 
             # after orientation is computed, we can access '.ma' attribute
             # which is for 'migration axis'
+
             cellentry = {
                 "Cell #": i,
                 "cell_x": celly + yxoffset[1],
@@ -336,7 +337,7 @@ class ImageField:
                 * self.dxy,
                 "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area
                 * self.dxy,
-                "nucleus_orientation": 180 - np.rad2deg(nori_ma),
+                "nucleus_orientation": np.rad2deg(nori_ma),
                 "nucleus_x": ox + yxoffset[1],
                 "nucleus_y": oy + yxoffset[0],
                 "nucleus_major_axis_x": ox - nucx_major + yxoffset[1],

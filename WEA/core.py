@@ -16,8 +16,8 @@ from scipy.ndimage import (
     binary_closing,
 )
 
-from numba import njit
 from scipy.spatial.distance import cdist
+from scipy.signal import fftconvolve
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.measure import label, regionprops
 from skimage.transform import rescale
@@ -25,7 +25,6 @@ from skimage.feature import peak_local_max
 from skimage.morphology import (
     convex_hull_image,
     remove_small_objects,
-    binary_erosion,
     disk,
     skeletonize,
 )
@@ -61,7 +60,8 @@ logging.basicConfig(
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
+    gpu=use_gpu,
+    pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
 )
 
 nucengine = models.CellposeModel(
@@ -99,17 +99,10 @@ def bbox2(img):
     return rmin, rmax, cmin, cmax
 
 
-def erode_labels(img, disk_radius=2):
-    return sum(
-        [
-            binary_erosion(img == i, footprint=disk(disk_radius)) * i
-            for i in range(1, img.max() + 1)
-        ]
-    )
-
-
 class ImageField:
-    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
+    def __init__(
+        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
+    ):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -173,11 +166,17 @@ class ImageField:
         self._nucdiam = nucdiam / scaled_dxy
 
         cmask, cflow, cstyle = cytoengine.eval(
-            img, diameter=self._celldiam, resample=True, channels=[2, 3],
+            img,
+            diameter=self._celldiam,
+            resample=True,
+            channels=[2, 3],
         )
 
         nmask, nflow, nstyle = nucengine.eval(
-            img, diameter=self._nucdiam, resample=True, channels=[3, 0],
+            img,
+            diameter=self._nucdiam,
+            resample=True,
+            channels=[3, 0],
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -203,7 +202,9 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam ** 2)
+        woundarea = remove_small_objects(
+            ~cellarea, min_size=self._celldiam**2
+        )
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -225,14 +226,19 @@ class ImageField:
 
         return rgb_img
 
-    def edge_cells(self, nucleus_erosion_radius=4):
+    def edge_cells(self, nuc_diam=15.0):
         """iterator function that yields edge cells
+
+        Args:
+            nuc_diam (float): diameter of a nucleus, used for computing morphological
+            opening operation footprint. This number is divided by 4 and scaled
+            by pixel size to simulate a disk approximately 1/4 the area.
 
         Each iteration yields ROI-cropped data:
         raw data, cytoplasm mask, wound edge, nucleus mask
 
         """
-
+        nucleus_opening_radius = int(np.round(nuc_diam / 4) / self.dxy)
         # resize labels and wound edge
         Ncells = int(self.labcells.max())
 
@@ -245,9 +251,12 @@ class ImageField:
             # rescale boxes images
             cell_mask = _rescale_mask(cell_mask, 1 / self.downscale_factor)
             cell_wound = _rescale_mask(cell_wound, 1 / self.downscale_factor)
-            cell_nucs = erode_labels(
-                _rescale_mask(self.labnucs, 1 / self.downscale_factor),
-                disk_radius=nucleus_erosion_radius,
+
+            # do the binary opening via fft
+            # flip `strel` inside out to prevent shifting output
+            cell_nucs = fft_binary_opening(
+                _rescale_mask(self.labnucs, 1 / self.downscale_factor) > 0,
+                disk(nucleus_opening_radius),
             )
 
             if on_edge:
@@ -273,7 +282,7 @@ class ImageField:
         # for cell stats
         cellcol = []
 
-        for i, d, m, n, w, yxoffset in self.edge_cells(nucleus_erosion_radius=5):
+        for i, d, m, n, w, yxoffset in self.edge_cells():
             ec = EdgeCell(i, d, m, n, w)
             celly, cellx = ec.cellprops[0].centroid
 
@@ -397,7 +406,10 @@ class Cell:
 
     def get_mtoc_locs(self, channel=1):
         p = peak_local_max(
-            self.data[:, :, channel], num_peaks=8, min_distance=3, threshold_rel=0.6,
+            self.data[:, :, channel],
+            num_peaks=8,
+            min_distance=3,
+            threshold_rel=0.6,
         )
         return p
 
@@ -418,7 +430,9 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
+        maxis_index = int(
+            np.sum(np.arange(self.distweights.size) * normweights)
+        )
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -427,7 +441,10 @@ class EdgeCell(Cell):
         _data = self.data[:, :, tubulin_channel]
         w = tub_box // 2
         tub_intensities = np.array(
-            [_data[r - w : r + (w + 1), c - w : c + (w + 1)].sum() for r, c in p]
+            [
+                _data[r - w : r + (w + 1), c - w : c + (w + 1)].sum()
+                for r, c in p
+            ]
         )
 
         oy, ox = self.nucleus_centroid
@@ -481,7 +498,9 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
+        sbox = wrkimg[
+            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
+        ]
         if sbox.sum() == 0:
             break
         # move current position
@@ -501,7 +520,9 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
+    return np.arctan2(
+        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
+    )
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -546,7 +567,9 @@ endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 
 def __find_endpoints(img):
-    endpt_response = convolve2d(img.astype(np.uint8), endpoint_kernel, mode="same")
+    endpt_response = convolve2d(
+        img.astype(np.uint8), endpoint_kernel, mode="same"
+    )
     endpts = np.where(endpt_response == 11)
     return endpts
 
@@ -595,3 +618,18 @@ def _rescale_mask(img, scale):
         # used for resizing labeled masks
         out = cv2.resize(img, (Lx, Ly), interpolation=cv2.INTER_NEAREST)
         return out
+
+
+def fft_binary_erosion(img, strel):
+    res = fftconvolve(img, strel, mode="same")
+    return res > (strel.sum() - 0.1)
+
+
+def fft_binary_dilation(img, strel):
+    res = fftconvolve(img, strel, mode="same")
+    return res > 0.1
+
+
+def fft_binary_opening(img, strel):
+    wrk = fft_binary_erosion(img, strel)
+    return fft_binary_dilation(wrk, strel)

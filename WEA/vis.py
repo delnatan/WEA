@@ -67,7 +67,7 @@ def random_colormap(N):
 def makeRGBComposite(
     img,
     ch_axis=-1,
-    ch_hues=(195.0, 100.0, 320.0),
+    ch_hues=(320.0, 100.0, 195.0),
     ch_sats=None,
     clip_low=None,
     clip_high=None,
@@ -102,9 +102,7 @@ def makeRGBComposite(
         hi = clip_high
 
     assert len(ch_hues) == Nch, "Number of channels must match given hues"
-    assert (
-        len(ch_sats) == Nch
-    ), "Number of channels must match given saturations"
+    assert len(ch_sats) == Nch, "Number of channels must match given saturations"
 
     # normalize hues & saturation so that [0,1]
     schues = [c / 360.0 for c in ch_hues]
@@ -144,20 +142,25 @@ def makeRGBComposite(
 
     # convert back to rgb space
     rgbs = [hsv_to_rgb(hsvimg) for hsvimg in hsvimgs]
-    # make the composite by averaging the rgb images
-    composite = np.mean(rgbs, axis=0)
+
+    # make the composite by averaging the rgb images,
+    # caution: averaging creates a dull-looking image!
+    # composite = np.mean(rgbs, axis=0)
+
+    # adding with clamp may work better
+    composite = np.zeros_like(rgbs[0])
+    composite[:, :, 0] = np.minimum(sum([rgbs[i][:, :, 0] for i in range(3)]), 1.0)
+    composite[:, :, 1] = np.minimum(sum([rgbs[i][:, :, 1] for i in range(3)]), 1.0)
+    composite[:, :, 2] = np.minimum(sum([rgbs[i][:, :, 2] for i in range(3)]), 1.0)
+
     # normalize to each channel maximal values
-    chmaxval = composite.max(axis=(0, 1))
-    return composite / chmaxval
+    # chmaxval = composite.max(axis=(0, 1))
+
+    return composite
 
 
 def drawSegmentationBorder(
-    rgbimg,
-    labels,
-    border_hue=0.0,
-    border_sat=1.0,
-    thickness=1,
-    already_edge=False,
+    rgbimg, labels, border_hue=0.0, border_sat=1.0, thickness=1, already_edge=False,
 ):
     """draw segmentation result as a border"""
     Nlabels = labels.max()
@@ -220,9 +223,7 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
         [[0, 0], [0, img2d.shape[-2]], [0, img2d.shape[-1]], img2d.shape[-2:]]
     )
     # compute distance from corners to the given origin
-    cornerdists = np.sqrt(
-        np.sum((corners - np.array([oriy, orix])) ** 2, axis=1)
-    )
+    cornerdists = np.sqrt(np.sum((corners - np.array([oriy, orix])) ** 2, axis=1))
     rmax = np.ceil(cornerdists.max())
     # setup radial vectors
     radvec = np.arange(rmax)
@@ -236,9 +237,9 @@ def radial_resampling(img2d, orix, oriy, start_deg=0, n_thetas=360):
     Nrads = radvec.size
     Nthetas = n_thetas
     yxvec = np.vstack([yvec.ravel(), xvec.ravel()])
-    resampled = map_coordinates(
-        img2d, yxvec, cval=0.0, prefilter=False
-    ).reshape((Nrads, Nthetas))
+    resampled = map_coordinates(img2d, yxvec, cval=0.0, prefilter=False).reshape(
+        (Nrads, Nthetas)
+    )
 
     return resampled
 
@@ -366,7 +367,7 @@ def polar_to_cartesian(theta, radius):
 
 
 def cartesian_to_polar(x, y):
-    radius = np.sqrt(x**2 + y**2)
+    radius = np.sqrt(x ** 2 + y ** 2)
     theta = np.arctan2(y, x)
     return np.array([theta, radius])
 
@@ -380,15 +381,15 @@ def polar_histogram(
     label=None,
     ax=None,
 ):
-    
+
     binrange = theta_range[1] - theta_range[0]
-    orientation_bins = np.linspace(theta_range[0], theta_range[1], num=(binrange // bin_increment) + 1)
+    orientation_bins = np.linspace(
+        theta_range[0], theta_range[1], num=(binrange // bin_increment) + 1
+    )
     counts, bins = np.histogram(data, bins=orientation_bins, density=density)
 
     if ax is None:
-        fig, ax = plt.subplots(
-            figsize=(6, 6), subplot_kw={"projection": "polar"}
-        )
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={"projection": "polar"})
 
     ax.set_theta_direction(-1)
     ax.set_theta_zero_location("N")

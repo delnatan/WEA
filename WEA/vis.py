@@ -372,10 +372,17 @@ def cartesian_to_polar(x, y):
 
 
 def polar_histogram(
-    data, color="C1", density=False, bin_increment=10, label=None, ax=None
+    data,
+    color="C1",
+    density=False,
+    theta_range=(-180, 180),
+    bin_increment=10,
+    label=None,
+    ax=None,
 ):
-
-    orientation_bins = np.linspace(-180, 180, num=(360 // bin_increment) + 1)
+    
+    binrange = theta_range[1] - theta_range[0]
+    orientation_bins = np.linspace(theta_range[0], theta_range[1], num=(binrange // bin_increment) + 1)
     counts, bins = np.histogram(data, bins=orientation_bins, density=density)
 
     if ax is None:
@@ -389,6 +396,7 @@ def polar_histogram(
     ax.set_xticks([])
     ax.set_rlim(-counts.max() * 0.25, counts.max() * 1.25)
 
+    ax.set_thetalim(np.deg2rad(theta_range[0]), np.deg2rad(theta_range[1]))
     # important: theta must be in radians (despite the labels in degrees)
     radbins = np.deg2rad(bins[:-1])
     widths = radbins[1] - radbins[0]
@@ -419,7 +427,7 @@ def polar_histogram(
         )
 
     # minor ticks
-    for i in range(360):
+    for i in range(theta_range[0], theta_range[1]):
         angle = np.pi * i / 180
         ax.plot(
             [angle, angle],
@@ -430,7 +438,7 @@ def polar_histogram(
         )
 
     # major ticks
-    for i in range(0, 360, 5):
+    for i in range(theta_range[0], theta_range[1], 5):
         angle = np.pi * i / 180
         ax.plot(
             [angle, angle],
@@ -440,7 +448,7 @@ def polar_histogram(
             clip_on=False,
         )
 
-    for i in range(-180, 180, 15):
+    for i in range(theta_range[0], theta_range[1], 15):
         angle = np.pi * i / 180
         ax.plot([angle, angle], [radius, 100], linewidth=0.5, color="0.75")
         ax.plot(
@@ -463,7 +471,7 @@ def polar_histogram(
             size="medium",
         )
 
-    for i in range(-180, 180, 90):
+    for i in range(theta_range[0], theta_range[1], 90):
         angle = np.pi * i / 180
         ax.plot(
             [angle, angle],

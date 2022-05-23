@@ -23,6 +23,7 @@ class CanonizedImage:
 
     def __init__(self, fn):
         self.filename = Path(fn)
+        self.metadata = None
         self._read()
 
     def _read(self):
@@ -31,6 +32,7 @@ class CanonizedImage:
             with DVFile(self.filename) as img:
                 self.dxy = img.hdr.dx
                 self.data = img.asarray()
+                self.metadata = img.hdr
             self.data = np.moveaxis(self.data, 0, -1)
 
         elif ext == ".nd2":

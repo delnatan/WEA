@@ -143,7 +143,9 @@ class ImageField:
 
         return cp_input, scaled_dxy
 
-    def segment_cells(self, celldiam=68.0, nucdiam=14.0, downsize=True):
+    def segment_cells(
+        self, celldiam=70.0, nucdiam=15.0, downsize=True, **kwargs
+    ):
         """resizes images and run cellpose
 
         These defaults have been acquired from working with 3T3 cells. You
@@ -165,11 +167,23 @@ class ImageField:
         self._celldiam = celldiam / scaled_dxy
         self._nucdiam = nucdiam / scaled_dxy
 
+        if "cyto_flow_threshold" in kwargs:
+            cyto_flow_threshold = kwargs["cyto_flow_threshold"]
+        else:
+            cyto_flow_threshold = 0.5
+
+        if "nuc_flow_threshold" in kwargs:
+            nuc_flow_threshold = kwargs["nuc_flow_threshold"]
+        else:
+            nuc_flow_threshold = 0.5
+
         cmask, cflow, cstyle = cytoengine.eval(
             img,
             diameter=self._celldiam,
             resample=True,
             channels=[2, 3],
+            flow_threshold=cyto_flow_threshold,
+            cellprob_threshold=-2.0,
         )
 
         nmask, nflow, nstyle = nucengine.eval(
@@ -177,6 +191,8 @@ class ImageField:
             diameter=self._nucdiam,
             resample=True,
             channels=[3, 0],
+            flow_threshold=nuc_flow_threshold,
+            cellprob_threshold=-2.0,
         )
 
         logging.info(f"Original image size is : {self.data.shape[0:2]}")
@@ -225,6 +241,24 @@ class ImageField:
         rgb_img[self.woundedge, 0] = 1.0
 
         return rgb_img
+
+    def _detection_result(self):
+        """returns pre-processed detection result for visual diagnostics
+
+        Note: the images will be rescaled to the raw image dimensions
+        via nearest-neighbor interpolation
+
+        """
+        targetsize = self.data.shape[:2]
+        woundedge = cv2.resize(
+            self.woundedge.astype(np.uint8),
+            targetsize,
+            interpolation=cv2.INTER_NEAREST,
+        )
+        cp_output = cv2.resize(
+            self.cp_labcells, targetsize, interpolation=cv2.INTER_NEAREST
+        )
+        return cp_output, woundedge
 
     def edge_cells(self, nuc_diam=15.0):
         """iterator function that yields edge cells
@@ -558,11 +592,13 @@ def norm_to_8bit(img):
     return np.uint8(normalize(img) * 255)
 
 
+# internal function used in trimming skeletonized image
 def __get_last_coordinates(dict_endpoints):
     N = len(dict_endpoints.keys())
     return np.array([dict_endpoints[i][-1] for i in range(N)])
 
 
+# kernel for detecting endpoints in 2D skeletonized image
 endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 

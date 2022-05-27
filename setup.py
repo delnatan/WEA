@@ -8,6 +8,7 @@ setup(
     description="Wound edge analysis in Python",
     install_requires=[
         "numpy",
+        "colorcet",
         "scikit-image",
         "cellpose",
         "scipy",

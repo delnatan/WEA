@@ -48,15 +48,27 @@ __log_dir = Path.home() / "WEA_log"
 if not __log_dir.exists():
     __log_dir.mkdir(exist_ok=True)
 
-# setup basic logging (may change directory later)
-logging.basicConfig(
-    filename=f"{__log_dir / 'WEA_dev.log'}",
-    filemode="w",
-    format="%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.DEBUG,
-)
 
+logger = logging.getLogger("WEA_logger")
+logger.setLevel(logging.DEBUG)
+fh = logging.FileHandler(f"{__log_dir / 'WEA_dev.log'}")
+fh.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+formatter = logging.Formatter("%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+# setup basic logging (may change directory later), old
+# logging.basicConfig(
+#     filename=f"{__log_dir / 'WEA_dev.log'}",
+#     filemode="w",
+#     format="%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s",
+#     datefmt="%Y-%m-%d %H:%M:%S",
+#     level=logging.DEBUG,
+# )
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
@@ -69,7 +81,7 @@ nucengine = models.CellposeModel(
 )
 
 
-logging.info(f"Using models from {str(__model_dir)}")
+logger.info(f"Using models from {str(__model_dir)}")
 
 
 endpt_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.float64)
@@ -195,10 +207,10 @@ class ImageField:
             cellprob_threshold=-2.0,
         )
 
-        logging.info(f"Original image size is : {self.data.shape[0:2]}")
-        logging.info(f"Cellpose input is resized to : {img.shape[0:2]}")
-        logging.info("Segmentation run with parameters:")
-        logging.info(
+        logger.info(f"Original image size is : {self.data.shape[0:2]}")
+        logger.info(f"Cellpose input is resized to : {img.shape[0:2]}")
+        logger.info("Segmentation run with parameters:")
+        logger.info(
             f"cell diameter={celldiam/scaled_dxy:.2f} px, nucleus diameter={nucdiam/scaled_dxy:.2f} px."
         )
 
@@ -323,12 +335,12 @@ class ImageField:
             if ec.nuclei_num == 1:
                 oy, ox = ec.nucleus_centroid
             elif ec.nuclei_num >= 2:
-                logging.info(
+                logger.info(
                     f"Cell {i:d} in {img_tag} has {ec.nuclei_num} nuclei. Skipping this cell"
                 )
                 continue
             elif ec.nuclei_num == 0:
-                logging.info(
+                logger.info(
                     f"Cell {i:d} in {img_tag} has no detected nuclei. Skipping this cell"
                 )
                 continue

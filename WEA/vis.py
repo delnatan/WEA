@@ -540,3 +540,53 @@ def view_in_napari(imgfield, napari_viewer, mtoc_df, cell_df):
         edge_color="cyan",
         face_color="cyan",
     )
+
+
+def add_to_napari(napari_viewer, mtoc_df, cell_df):
+    """adds mtoc locations and migration/nucleus orientation vectors
+
+    Mtoc locations are added as points, and the vectors are added as "lines"
+    on top of the image layers.
+
+    """
+    motherdf = mtoc_df[mtoc_df["mtoc_identity"] == "mother"]
+    ma_pts = [
+        row[["nucleus_y", "nucleus_x", "migration_y", "migration_x"]]
+        .values.reshape(2, 2)
+        .astype(float)
+        for i, row in cell_df.iterrows()
+    ]
+    nucmaj_pts = [
+        row[
+            [
+                "nucleus_y",
+                "nucleus_x",
+                "nucleus_major_axis_y",
+                "nucleus_major_axis_x",
+            ]
+        ]
+        .values.reshape(2, 2)
+        .astype(float)
+        for i, row in cell_df.iterrows()
+    ]
+    napari_viewer.add_points(
+        motherdf[["y", "x"]].values, size=10, edge_color="green"
+    )
+
+    napari_viewer.add_shapes(
+        ma_pts,
+        shape_type="line",
+        name="migration axis",
+        edge_width=5,
+        edge_color="red",
+        face_color="red",
+    )
+
+    napari_viewer.add_shapes(
+        nucmaj_pts,
+        name="nucleus axis",
+        shape_type="line",
+        edge_width=4,
+        edge_color="cyan",
+        face_color="cyan",
+    )

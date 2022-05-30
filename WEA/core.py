@@ -3,42 +3,34 @@ Wound edge analysis modules and functions
 
 """
 import logging
-import torch
 import re
-import numpy as np
-import cv2
-
-from pathlib import Path
-from cellpose import models
-from scipy.signal import convolve2d
-from scipy.ndimage import (
-    binary_fill_holes,
-    binary_closing,
-)
-
-from scipy.spatial.distance import cdist
-from scipy.signal import fftconvolve
-from skimage.segmentation import clear_border, find_boundaries
-from skimage.measure import label, regionprops
-from skimage.transform import rescale
-from skimage.feature import peak_local_max
-from skimage.morphology import (
-    convex_hull_image,
-    remove_small_objects,
-    disk,
-    skeletonize,
-)
 from itertools import chain
-import pandas as pd
+from pathlib import Path
 
-from .vis import makeRGBComposite
+import cv2
+import numpy as np
+import pandas as pd
+import torch
+from cellpose import models
+from scipy.ndimage import binary_closing, binary_fill_holes
+from scipy.signal import convolve2d, fftconvolve
+from scipy.spatial.distance import cdist
+from skimage.feature import peak_local_max
+from skimage.measure import label, regionprops
+from skimage.morphology import (convex_hull_image, disk, remove_small_objects,
+                                skeletonize)
+from skimage.segmentation import clear_border, find_boundaries
+from skimage.transform import rescale
+
 from . import __file__
+from .vis import makeRGBComposite
 
 # check whether GPU is available
 if torch.cuda.is_available():
     use_gpu = True
 else:
     use_gpu = False
+
 
 # get current module path by using the __file__ attribute
 __module_dir = Path(__file__).parent
@@ -55,20 +47,14 @@ fh = logging.FileHandler(f"{__log_dir / 'WEA_dev.log'}")
 fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.ERROR)
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s")
+formatter = logging.Formatter(
+    "%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s"
+)
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-# setup basic logging (may change directory later), old
-# logging.basicConfig(
-#     filename=f"{__log_dir / 'WEA_dev.log'}",
-#     filemode="w",
-#     format="%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s",
-#     datefmt="%Y-%m-%d %H:%M:%S",
-#     level=logging.DEBUG,
-# )
 
 # custom models are stored in $HOME/.cellpose/models
 cytoengine = models.CellposeModel(
@@ -112,9 +98,7 @@ def bbox2(img):
 
 
 class ImageField:
-    def __init__(
-        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
-    ):
+    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -155,9 +139,7 @@ class ImageField:
 
         return cp_input, scaled_dxy
 
-    def segment_cells(
-        self, celldiam=70.0, nucdiam=15.0, downsize=True, **kwargs
-    ):
+    def segment_cells(self, celldiam=70.0, nucdiam=15.0, downsize=True, **kwargs):
         """resizes images and run cellpose
 
         These defaults have been acquired from working with 3T3 cells. You
@@ -224,15 +206,11 @@ class ImageField:
     def run_detection(self, cell_diam=68.0, nuc_diam=15.0, downsize=True):
 
         if self.cp_labcells is None:
-            self.segment_cells(
-                celldiam=cell_diam, nucdiam=nuc_diam, downsize=downsize
-            )
+            self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam, downsize=downsize)
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(
-            ~cellarea, min_size=self._celldiam**2
-        )
+        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam**2)
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -378,8 +356,7 @@ class ImageField:
                 "cell_perimeter": ec.cellprops[0].perimeter * self.dxy,
                 "equivalent_diameter": ec.cellprops[0].equivalent_diameter_area
                 * self.dxy,
-                "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area
-                * self.dxy,
+                "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area * self.dxy,
                 "nucleus_orientation": np.rad2deg(nori_ma),
                 "nucleus_x": ox + yxoffset[1],
                 "nucleus_y": oy + yxoffset[0],
@@ -476,9 +453,7 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(
-            np.sum(np.arange(self.distweights.size) * normweights)
-        )
+        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -487,10 +462,7 @@ class EdgeCell(Cell):
         _data = self.data[:, :, tubulin_channel]
         w = tub_box // 2
         tub_intensities = np.array(
-            [
-                _data[r - w : r + (w + 1), c - w : c + (w + 1)].sum()
-                for r, c in p
-            ]
+            [_data[r - w : r + (w + 1), c - w : c + (w + 1)].sum() for r, c in p]
         )
 
         oy, ox = self.nucleus_centroid
@@ -544,9 +516,7 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[
-            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
-        ]
+        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
         if sbox.sum() == 0:
             break
         # move current position
@@ -566,9 +536,7 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(
-        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
-    )
+    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -615,9 +583,7 @@ endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 
 def __find_endpoints(img):
-    endpt_response = convolve2d(
-        img.astype(np.uint8), endpoint_kernel, mode="same"
-    )
+    endpt_response = convolve2d(img.astype(np.uint8), endpoint_kernel, mode="same")
     endpts = np.where(endpt_response == 11)
     return endpts
 

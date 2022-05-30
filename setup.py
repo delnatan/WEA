@@ -16,5 +16,6 @@ setup(
         "mrc",
         "pandas",
         "nd2reader",
+        "flask",
     ],
 )

@@ -4,6 +4,7 @@ Wound edge analysis modules and functions
 """
 import logging
 import re
+# import pdb
 from itertools import chain
 from pathlib import Path
 
@@ -203,7 +204,7 @@ class ImageField:
         self._cyt_cellprob = cflow[2]
         self.cp_labnucs = nmask
 
-    def run_detection(self, cell_diam=68.0, nuc_diam=15.0, downsize=True):
+    def run_detection(self, cell_diam=70.0, nuc_diam=15.0, downsize=True):
 
         if self.cp_labcells is None:
             self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam, downsize=downsize)
@@ -215,7 +216,7 @@ class ImageField:
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
         # remove cells touching the border
-        self.labcells = label(clear_border(self.cp_labcells))
+        self.labcells = clear_border(self.cp_labcells)
         self.labnucs = self.labcells * (self.cp_labnucs > 0)
 
     def _segmentation_result(self, **kwargs):
@@ -263,27 +264,34 @@ class ImageField:
 
         """
         nucleus_opening_radius = int(np.round(nuc_diam / 4) / self.dxy)
-        # resize labels and wound edge
-        Ncells = int(self.labcells.max())
 
-        for i in range(1, Ncells + 1):
+        # get label ids for cells at the edge
+        woundcells = self.labcells * self.woundedge
+        edge_id = np.delete(np.unique(woundcells), 0)
+
+        # rescale image labels
+        labeled_cells = cv2.resize(
+            self.labcells, (self.Nx, self.Ny), interpolation=cv2.INTER_NEAREST
+        )
+        wound_edge = cv2.resize(
+            self.woundedge.astype(np.float32),
+            (self.Nx, self.Ny),
+            interpolation=cv2.INTER_LINEAR,
+        ).astype(bool)
+
+        nuc_mask = cv2.resize(
+            self.labnucs, (self.Nx, self.Ny), interpolation=cv2.INTER_NEAREST
+        )
+        # do the binary opening via fft
+        cell_nucs = fft_binary_opening(nuc_mask > 0, disk(nucleus_opening_radius))
+
+        for i in edge_id:
             # clean up cell_mask
-            cell_mask = binary_closing(self.labcells == i)
-            cell_wound = skeletonize(cell_mask * self.woundedge)
-            on_edge = np.sum(cell_wound) > 0
+            cell_mask = binary_closing(labeled_cells == i)
+            cell_wound = skeletonize(cell_mask * wound_edge)
+            proper_edge = label(cell_wound).max() == 1
 
-            # rescale boxes images
-            cell_mask = _rescale_mask(cell_mask, 1 / self.downscale_factor)
-            cell_wound = _rescale_mask(cell_wound, 1 / self.downscale_factor)
-
-            # do the binary opening via fft
-            # flip `strel` inside out to prevent shifting output
-            cell_nucs = fft_binary_opening(
-                _rescale_mask(self.labnucs, 1 / self.downscale_factor) > 0,
-                disk(nucleus_opening_radius),
-            )
-
-            if on_edge:
+            if proper_edge:
                 rmin, rmax, cmin, cmax = bbox2(cell_mask)
                 ri = rmin - 2
                 rf = rmax + 3
@@ -295,7 +303,8 @@ class ImageField:
                 mask_ = cell_mask[ri:rf, ci:cf]
                 data_ = self.data[ri:rf, ci:cf] * cell_mask[ri:rf, ci:cf, None]
                 wound_ = cell_wound[ri:rf, ci:cf]
-                nuc_ = label(cell_nucs[ri:rf, ci:cf] * cell_mask[ri:rf, ci:cf])
+                # if multiple nuclei are present, we want to label each one
+                nuc_ = label(mask_ * cell_nucs[ri:rf, ci:cf])
                 yield i, data_, mask_, nuc_, wound_, centroid
             else:
                 pass
@@ -618,20 +627,6 @@ def trim_skeleton_to_endpoints(skelimg, n_ends=2):
 
         survived_epts = tuple([dict_eps[i][0] for i in eid_])
         return wrk, survived_epts
-
-
-def _rescale_mask(img, scale):
-    Ly = int(scale * img.shape[0])
-    Lx = int(scale * img.shape[1])
-    if img.dtype == "bool":
-        out = cv2.resize(
-            img.astype(np.float32), (Lx, Ly), interpolation=cv2.INTER_LINEAR
-        )
-        return (out > 0).astype(img.dtype)
-    elif img.dtype == "int":
-        # used for resizing labeled masks
-        out = cv2.resize(img, (Lx, Ly), interpolation=cv2.INTER_NEAREST)
-        return out
 
 
 def fft_binary_erosion(img, strel):

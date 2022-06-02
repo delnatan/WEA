@@ -313,7 +313,7 @@ def make_img_montage(imglist, ncol=5, pad=4):
     else:
         montage_size = (montage_rowsize, montage_colsize)
 
-    montage = np.ones(montage_size, dtype=imglist[0].dtype)
+    montage = np.zeros(montage_size, dtype=imglist[0].dtype)
 
     for i, im in enumerate(imglist):
 

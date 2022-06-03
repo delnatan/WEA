@@ -58,14 +58,17 @@ logger.addHandler(ch)
 
 
 # custom models are stored in $HOME/.cellpose/models
-cytoengine = models.CellposeModel(
-    gpu=use_gpu,
-    pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
-)
+# cytoengine = models.CellposeModel(
+#     gpu=use_gpu,
+#     pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
+# )
 
-nucengine = models.CellposeModel(
-    gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
-)
+# nucengine = models.CellposeModel(
+#     gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
+# )
+
+DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v02_blur")
+DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v01")
 
 
 logger.info(f"Using models from {str(__model_dir)}")
@@ -109,6 +112,17 @@ class ImageField:
         self.cp_labcells = None
         self.cp_labnucs = None
         self.downscale_factor = 1.0
+        self._load_cellpose_model()
+
+    def _load_cellpose_model(
+        self, cyto_model_path=DEFAULT_CYTO_PATH, nuc_model_path=DEFAULT_NUC_PATH
+    ):
+        self.cytoengine = models.CellposeModel(
+            gpu=use_gpu, pretrained_model=cyto_model_path
+        )
+        self.nucengine = models.CellposeModel(
+            gpu=use_gpu, pretrained_model=nuc_model_path
+        )
 
     def _create_cellpose_input(
         self, input_cell_diam, target_cell_diam=100, downsize=True
@@ -172,7 +186,7 @@ class ImageField:
         else:
             nuc_flow_threshold = 0.5
 
-        cmask, cflow, cstyle = cytoengine.eval(
+        cmask, cflow, cstyle = self.cytoengine.eval(
             img,
             diameter=self._celldiam,
             resample=True,
@@ -181,7 +195,7 @@ class ImageField:
             cellprob_threshold=-2.0,
         )
 
-        nmask, nflow, nstyle = nucengine.eval(
+        nmask, nflow, nstyle = self.nucengine.eval(
             img,
             diameter=self._nucdiam,
             resample=True,
@@ -221,15 +235,16 @@ class ImageField:
 
     def _segmentation_result(self, **kwargs):
 
-        cell_boundaries = find_boundaries(self.labcells, mode="thin")
-        nuc_boundaries = find_boundaries(self.labnucs, mode="thin")
+        cell_boundaries = find_boundaries(self.cp_labcells, mode="thin")
+        nuc_boundaries = find_boundaries(self.cp_labnucs, mode="thin")
 
         rgb_img = makeRGBComposite(self.cp_input, ch_axis=-1, **kwargs)
 
         rgb_img[cell_boundaries, 0] = 1.0
         rgb_img[cell_boundaries, 1] = 1.0
+        rgb_img[nuc_boundaries, 1] = 1.0
         rgb_img[nuc_boundaries, 2] = 1.0
-        rgb_img[self.woundedge, 0] = 1.0
+        # rgb_img[self.woundedge, 0] = 1.0
 
         return rgb_img
 
@@ -310,6 +325,7 @@ class ImageField:
                 pass
 
     def run_analysis(self, img_tag):
+        """do single-cell analysis for this ImageField"""
         # for mtoc stats
         datacol = []
         # for cell stats

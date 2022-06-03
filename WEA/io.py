@@ -6,7 +6,6 @@ Image io for WAC
 from mrc import DVFile
 from nd2reader import ND2Reader
 from tifffile import imread
-from skimage.transform import rescale
 from scipy.ndimage import sobel
 import numpy as np
 from pathlib import Path

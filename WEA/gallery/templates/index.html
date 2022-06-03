@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="static/style.css">
+<script type="text/javascript" src="static/script.js"></script>
+</head>
+<body>
+
+<h1>Composite Image Gallery</h1>
+  <p> Image counts : <span> {{ Nimages }} </span>
+  <div class="overlay">
+    <span id="close" hidden=True onclick=do_close()>
+      <b><u>CLOSE(X)</u></b>
+    </span>
+    <img src="inset_img" id="top" hidden=True>
+  </div>
+
+  <div class="cx" style="background-color:fff;">
+    <center>
+    <form method="POST" action="">
+    {% for path in paths %}
+        <div id="imgcontainer">
+          <span id="imgname"> {{ get_filename(path) }} </span><br>
+          <img src='cdn/{{ path }}' height=300 width=300 onclick="clicked_img(this)"><br>
+          <input type="checkbox" name="marked_files" id="{{ get_filename(path) }}" value="{{ get_filename(path) }}">
+            <label for="{{ get_filename(path) }}"> mark for training </label>
+        </div>
+    {% endfor %}
+    <br>    
+    </center>
+  </div>
+  <p>
+  <div style="position: fixed; top: 5%; right: 15%">
+    <button type="submit" style="font-size: 25px; background-color: green;">Save Annotation</button>
+  </div>
+  </form>
+</body>
+</html>

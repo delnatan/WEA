@@ -62,17 +62,27 @@ def home():
         # POST, when form is submitted
 
         disp_dir = FlaskApp.config["DISPLAY_DIR"]
+        raw_dir = FlaskApp.config["IMAGE_DIR"]
+
         # get a list of files that have been marked
         markedfiles = request.form.getlist("marked_files")
+        
         # and move them to a new folder
         moved_disp_dir = os.path.join(disp_dir, "marked")
+        moved_raw_dir = os.path.join(raw_dir, "marked")
 
         if not os.path.exists(moved_disp_dir):
             os.mkdir(moved_disp_dir)
 
+        if not os.path.exists(moved_raw_dir):
+            os.mkdir(moved_raw_dir)
+
+
         # moved marked files into "marked" subfolder
         for f in markedfiles:
+            raw_fn = f"{os.path.splitext(f)[0]}.tif"
             shutil.move(os.path.join(disp_dir, f), os.path.join(moved_disp_dir, f))
+            shutil.move(os.path.join(raw_dir, raw_fn), os.path.join(moved_raw_dir, raw_fn))
 
         # repopulate page with the remaining images
         image_paths = []
@@ -102,6 +112,7 @@ def download_file(filepath):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Usage: %prog [options]")
     parser.add_argument("disp_dir", help="Cellpose results (boundaries marked) path")
+    parser.add_argument("raw_dir", help="Raw (input) images for cellpose annotation")
     parser.add_argument(
         "-l",
         "--listen",
@@ -121,6 +132,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     FlaskApp.config["DISPLAY_DIR"] = args.disp_dir
+    FlaskApp.config["IMAGE_DIR"] = args.raw_dir
     # disable caching
     FlaskApp.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
     FlaskApp.run(host=args.host, port=args.port, debug=True)

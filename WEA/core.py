@@ -332,7 +332,13 @@ class ImageField:
         cellcol = []
 
         for i, d, m, n, w, yxoffset in self.edge_cells():
-            ec = EdgeCell(i, d, m, n, w)
+
+            try:
+                ec = EdgeCell(i, d, m, n, w)
+            except UnboundLocalError:
+                logger.info(f"Cell #{i} in {img_tag} does not have a proper wound edge. Skipping")
+                continue
+
             celly, cellx = ec.cellprops[0].centroid
 
             if ec.nuclei_num == 1:

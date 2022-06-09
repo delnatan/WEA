@@ -255,7 +255,7 @@ class ImageField:
         via nearest-neighbor interpolation
 
         """
-        targetsize = self.data.shape[:2]
+        targetsize = self.data.shape[:2][::-1]
         woundedge = cv2.resize(
             self.woundedge.astype(np.uint8),
             targetsize,

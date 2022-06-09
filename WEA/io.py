@@ -5,7 +5,7 @@ Image io for WAC
 
 from mrc import DVFile
 from nd2reader import ND2Reader
-from tifffile import imread
+from tifffile import imread, TiffFile
 from scipy.ndimage import sobel
 import numpy as np
 from pathlib import Path
@@ -49,11 +49,17 @@ class CanonizedImage:
                 # )
         elif ext == ".tif" or ext == ".tiff":
             data = imread(self.filename)
+            
+            with TiffFile(self.filename) as tif:
+                xres = tif.pages[0].tags['XResolution'].value
+                dxy = np.round(xres[1] / xres[0], 5)
+            
             # try to infer channel axis
             ch_axis = np.argmin(data.shape)
             # and move it as the last axis
             data = np.moveaxis(data, ch_axis, -1)
             self.data = data
+            self.dxy = dxy
 
         else:
             raise NotImplementedError

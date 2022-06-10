@@ -4,6 +4,7 @@ Wound edge analysis modules and functions
 """
 import logging
 import re
+
 # import pdb
 from itertools import chain
 from pathlib import Path
@@ -18,8 +19,12 @@ from scipy.signal import convolve2d, fftconvolve
 from scipy.spatial.distance import cdist
 from skimage.feature import peak_local_max
 from skimage.measure import label, regionprops
-from skimage.morphology import (convex_hull_image, disk, remove_small_objects,
-                                skeletonize)
+from skimage.morphology import (
+    convex_hull_image,
+    disk,
+    remove_small_objects,
+    skeletonize,
+)
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.transform import rescale
 
@@ -67,7 +72,7 @@ logger.addHandler(ch)
 #     gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
 # )
 
-DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v02_blur")
+DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v01")
 
 
@@ -336,7 +341,9 @@ class ImageField:
             try:
                 ec = EdgeCell(i, d, m, n, w)
             except UnboundLocalError:
-                logger.info(f"Cell #{i} in {img_tag} does not have a proper wound edge. Skipping")
+                logger.info(
+                    f"Cell #{i} in {img_tag} does not have a proper wound edge. Skipping"
+                )
                 continue
 
             celly, cellx = ec.cellprops[0].centroid

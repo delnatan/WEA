@@ -49,11 +49,11 @@ class CanonizedImage:
                 # )
         elif ext == ".tif" or ext == ".tiff":
             data = imread(self.filename)
-            
+
             with TiffFile(self.filename) as tif:
-                xres = tif.pages[0].tags['XResolution'].value
+                xres = tif.pages[0].tags["XResolution"].value
                 dxy = np.round(xres[1] / xres[0], 5)
-            
+
             # try to infer channel axis
             ch_axis = np.argmin(data.shape)
             # and move it as the last axis
@@ -68,6 +68,9 @@ class CanonizedImage:
         """return best focused z-slice in all channel"""
         zid = find_focus(self.data[..., channel])
         return self.data[zid, ...]
+
+    def max_project(self):
+        return self.data.max(axis=0)
 
     def __str__(self):
         str_repr = f"filename: {self.filename}\n"

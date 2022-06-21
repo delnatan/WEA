@@ -5,7 +5,6 @@ Wound edge analysis modules and functions
 import logging
 import re
 
-# import pdb
 from itertools import chain
 from pathlib import Path
 
@@ -73,8 +72,9 @@ logger.addHandler(ch)
 # )
 
 DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3")
+# DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v02_blur")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v01")
-
+DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v1")
 
 logger.info(f"Using models from {str(__model_dir)}")
 
@@ -122,6 +122,7 @@ class ImageField:
     def _load_cellpose_model(
         self, cyto_model_path=DEFAULT_CYTO_PATH, nuc_model_path=DEFAULT_NUC_PATH
     ):
+
         self.cytoengine = models.CellposeModel(
             gpu=use_gpu, pretrained_model=cyto_model_path
         )
@@ -159,7 +160,15 @@ class ImageField:
 
         return cp_input, scaled_dxy
 
-    def segment_cells(self, celldiam=70.0, nucdiam=15.0, downsize=True, **kwargs):
+    def segment_cells(
+        self,
+        cytochs=[2, 3],
+        nucchs=[3, 0],
+        celldiam=70.0,
+        nucdiam=15.0,
+        downsize=True,
+        **kwargs,
+    ):
         """resizes images and run cellpose
 
         These defaults have been acquired from working with 3T3 cells. You
@@ -195,7 +204,7 @@ class ImageField:
             img,
             diameter=self._celldiam,
             resample=True,
-            channels=[2, 3],
+            channels=cytochs,
             flow_threshold=cyto_flow_threshold,
             cellprob_threshold=-2.0,
         )
@@ -204,7 +213,7 @@ class ImageField:
             img,
             diameter=self._nucdiam,
             resample=True,
-            channels=[3, 0],
+            channels=nucchs,
             flow_threshold=nuc_flow_threshold,
             cellprob_threshold=-2.0,
         )
@@ -223,10 +232,23 @@ class ImageField:
         self._cyt_cellprob = cflow[2]
         self.cp_labnucs = nmask
 
-    def run_detection(self, cell_diam=70.0, nuc_diam=15.0, downsize=True):
+    def run_detection(
+        self,
+        cell_diam=70.0,
+        nuc_diam=15.0,
+        cytochs=[2, 3],
+        nucchs=[3, 0],
+        downsize=True,
+    ):
 
         if self.cp_labcells is None:
-            self.segment_cells(celldiam=cell_diam, nucdiam=nuc_diam, downsize=downsize)
+            self.segment_cells(
+                celldiam=cell_diam,
+                nucdiam=nuc_diam,
+                downsize=downsize,
+                cytochs=cytochs,
+                nucchs=nucchs,
+            )
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
@@ -362,7 +384,9 @@ class ImageField:
                 continue
 
             # compute orientation
-            p, tub_ints, oris = ec.get_mtoc_orientation()
+            p, tub_ints, oris = ec.get_mtoc_orientation(
+                channel=self.cyt_ch, tubulin_channel=self.tub_ch
+            )
 
             # compute nucleus orientation
             nori = ec.nucprops[0].orientation
@@ -425,6 +449,7 @@ class ImageField:
 
         # convert mtoc data into DataFrame
         df = pd.DataFrame(datacol)
+
         mother_ids = df.loc[:, "tubulin_intensity"] == df.groupby("Cell #")[
             "tubulin_intensity"
         ].transform("max")

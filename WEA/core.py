@@ -73,7 +73,7 @@ logger.addHandler(ch)
 
 DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3b")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v01")
-DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v2")
+DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v3")
 
 logger.info(f"Using models from {str(__model_dir)}")
 

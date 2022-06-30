@@ -33,6 +33,11 @@ class CanonizedImage:
                 self.data = img.asarray()
                 self.metadata = img.hdr
             self.data = np.moveaxis(self.data, 0, -1)
+            wavelengths = [
+                self.metadata.__getattribute__(f"wave{i:d}") for i in range(1, 5)
+            ]
+            ch_names = [f"{i:d} nm" for i in wavelengths if i != 0]
+            self.channels = ch_names
 
         elif ext == ".nd2":
             # ND2Reader takes in path as a string
@@ -42,11 +47,8 @@ class CanonizedImage:
                 # the first 'image' then has all of the data
                 self.data = img[0]
                 self.dxy = img.metadata["pixel_microns"]
-                # dz = np.abs(
-                #     np.round(
-                #         np.median(np.diff(img.metadata["z_coordinates"])), 3
-                #     )
-                # )
+                self.channels = img.metadata["channels"]
+
         elif ext == ".tif" or ext == ".tiff":
             data = imread(self.filename)
 
@@ -60,6 +62,7 @@ class CanonizedImage:
             data = np.moveaxis(data, ch_axis, -1)
             self.data = data
             self.dxy = dxy
+            self.channels = [f"{i:d}" for i in range(1, data.shape[0] + 1)]
 
         else:
             raise NotImplementedError

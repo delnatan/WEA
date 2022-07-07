@@ -10,9 +10,9 @@ def det_norm_hess(img, r=1.8):
     # t, is scale (or variance)
     t = s * s
 
-    Lxx = gaussian_filter(inputimg, sigma=s, order=(0, 2))
-    Lyy = gaussian_filter(inputimg, sigma=s, order=(2, 0))
-    Lxy = gaussian_filter(inputimg, sigma=s, order=(1, 1))
+    Lxx = gaussian_filter(img, sigma=s, order=(0, 2))
+    Lyy = gaussian_filter(img, sigma=s, order=(2, 0))
+    Lxy = gaussian_filter(img, sigma=s, order=(1, 1))
 
     detHimg = t * t * (Lxx * Lyy - Lxy * Lxy)
 

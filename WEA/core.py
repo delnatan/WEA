@@ -71,7 +71,7 @@ logger.addHandler(ch)
 #     gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
 # )
 
-DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3b")
+DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3c")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v01")
 DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v3")
 

@@ -22,7 +22,7 @@ from skimage.morphology import (
     convex_hull_image,
     disk,
     remove_small_objects,
-    skeletonize,
+    skeletonize_3d,
 )
 from skimage.segmentation import clear_border, find_boundaries
 from skimage.transform import rescale
@@ -329,7 +329,7 @@ class ImageField:
         for i in edge_id:
             # clean up cell_mask
             cell_mask = binary_closing(labeled_cells == i)
-            cell_wound = skeletonize(cell_mask * wound_edge)
+            cell_wound = skeletonize_3d(cell_mask * wound_edge).astype(bool)
             proper_edge = label(cell_wound).max() == 1
 
             if proper_edge:
@@ -503,9 +503,7 @@ class EdgeCell(Cell):
     def __init__(self, cell_id, data, cytomask, nucmask, woundedge):
         super().__init__(cell_id, data, cytomask, nucmask)
         self.woundedge = woundedge
-        self.single_edge, self.edge_endpts = trim_skeleton_to_endpoints(
-            skeletonize(woundedge)
-        )
+        self.single_edge, self.edge_endpts = trim_skeleton_to_endpoints(woundedge)
         self.endpoints_computed = False
 
     def compute_migration_axis(self):

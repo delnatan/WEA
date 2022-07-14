@@ -383,8 +383,15 @@ class ImageField:
                 continue
 
             # compute orientation
+
+            # box size for integrating tubulin intensities, default 1.5 um box
+            tub_box_size = int(1.5 // self.dxy)
+            # enforce odd-sized box (add one if size is even)
+            odd_offset = 1 if (tub_box_size % 2 == 0) else 0
+            tub_box_size += odd_offset
+
             p, tub_ints, oris = ec.get_mtoc_orientation(
-                channel=self.cyt_ch, tubulin_channel=self.tub_ch
+                channel=self.cyt_ch, tubulin_channel=self.tub_ch, tub_box=tub_box_size
             )
 
             # compute nucleus orientation

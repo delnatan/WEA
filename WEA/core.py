@@ -25,7 +25,6 @@ from skimage.morphology import (
     skeletonize_3d,
 )
 from skimage.segmentation import clear_border, find_boundaries
-from skimage.transform import rescale
 
 from . import __file__
 from .vis import makeRGBComposite
@@ -134,17 +133,10 @@ class ImageField:
     ):
 
         if downsize:
-
             downscale_factor = target_cell_diam / input_cell_diam
             self.downscale_factor = downscale_factor
-
-            img = rescale(
-                self.data,
-                downscale_factor,
-                channel_axis=-1,
-                preserve_range=True,
-                anti_aliasing=True,
-            )
+            ty, tx = [round(downscale_factor * s) for s in self.data.shape[:2]]
+            img = cv2.resize(self.data, (tx, ty), interpolation=cv2.INTER_LINEAR)
             scaled_dxy = self.dxy / downscale_factor
         else:
             img = self.data.astype(np.float32)

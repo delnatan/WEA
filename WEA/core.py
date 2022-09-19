@@ -105,7 +105,9 @@ def bbox2(img):
 
 
 class ImageField:
-    def __init__(self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2):
+    def __init__(
+        self, data, pixel_size, nucleus_ch=0, cyto_channel=1, tubulin_ch=2
+    ):
         self.data = data
         self.dxy = pixel_size
         self.nuc_ch = nucleus_ch
@@ -136,7 +138,9 @@ class ImageField:
             downscale_factor = target_cell_diam / input_cell_diam
             self.downscale_factor = downscale_factor
             ty, tx = [round(downscale_factor * s) for s in self.data.shape[:2]]
-            img = cv2.resize(self.data, (tx, ty), interpolation=cv2.INTER_LINEAR)
+            img = cv2.resize(
+                self.data, (tx, ty), interpolation=cv2.INTER_LINEAR
+            )
             scaled_dxy = self.dxy / downscale_factor
         else:
             img = self.data.astype(np.float32)
@@ -243,7 +247,9 @@ class ImageField:
 
         # identify wound edge
         cellarea = binary_fill_holes(self.cp_labcells > 0)
-        woundarea = remove_small_objects(~cellarea, min_size=self._celldiam**2)
+        woundarea = remove_small_objects(
+            ~cellarea, min_size=self._celldiam**2
+        )
         # we need this thick so that it overlaps with cell masks
         self.woundedge = find_boundaries(woundarea, mode="thick")
 
@@ -316,7 +322,9 @@ class ImageField:
             self.labnucs, (self.Nx, self.Ny), interpolation=cv2.INTER_NEAREST
         )
         # do the binary opening via fft
-        cell_nucs = fft_binary_opening(nuc_mask > 0, disk(nucleus_opening_radius))
+        cell_nucs = fft_binary_opening(
+            nuc_mask > 0, disk(nucleus_opening_radius)
+        )
 
         for i in edge_id:
             # clean up cell_mask
@@ -383,7 +391,9 @@ class ImageField:
             tub_box_size += odd_offset
 
             p, tub_ints, oris = ec.get_mtoc_orientation(
-                channel=self.cyt_ch, tubulin_channel=self.tub_ch, tub_box=tub_box_size
+                channel=self.cyt_ch,
+                tubulin_channel=self.tub_ch,
+                tub_box=tub_box_size,
             )
 
             # compute nucleus orientation
@@ -416,7 +426,8 @@ class ImageField:
                 "cell_perimeter": ec.cellprops[0].perimeter * self.dxy,
                 "equivalent_diameter": ec.cellprops[0].equivalent_diameter_area
                 * self.dxy,
-                "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area * self.dxy,
+                "nucleus_diameter": ec.nucprops[0].equivalent_diameter_area
+                * self.dxy,
                 "nucleus_orientation": np.rad2deg(nori_ma),
                 "nucleus_x": ox + yxoffset[1],
                 "nucleus_y": oy + yxoffset[0],
@@ -502,7 +513,9 @@ class EdgeCell(Cell):
     def __init__(self, cell_id, data, cytomask, nucmask, woundedge):
         super().__init__(cell_id, data, cytomask, nucmask)
         self.woundedge = woundedge
-        self.single_edge, self.edge_endpts = trim_skeleton_to_endpoints(woundedge)
+        self.single_edge, self.edge_endpts = trim_skeleton_to_endpoints(
+            woundedge
+        )
         self.endpoints_computed = False
 
     def compute_migration_axis(self):
@@ -512,7 +525,9 @@ class EdgeCell(Cell):
         _dx = sortededge[:, 1] - ox
         self.distweights = np.sqrt(_dy * _dy + _dx * _dx)
         normweights = self.distweights / self.distweights.sum()
-        maxis_index = int(np.sum(np.arange(self.distweights.size) * normweights))
+        maxis_index = int(
+            np.sum(np.arange(self.distweights.size) * normweights)
+        )
         my, mx = sortededge[maxis_index, :]
         return np.array([my - oy, mx - ox])
 
@@ -521,7 +536,10 @@ class EdgeCell(Cell):
         _data = self.data[:, :, tubulin_channel]
         w = tub_box // 2
         tub_intensities = np.array(
-            [_data[r - w : r + (w + 1), c - w : c + (w + 1)].sum() for r, c in p]
+            [
+                _data[r - w : r + (w + 1), c - w : c + (w + 1)].sum()
+                for r, c in p
+            ]
         )
 
         oy, ox = self.nucleus_centroid
@@ -575,7 +593,9 @@ def sort_edge_coords(skeletonized_edge, endpoint):
     while True:
         i += 1
         wrkimg[curpos[0], curpos[1]] = 0
-        sbox = wrkimg[curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2]
+        sbox = wrkimg[
+            curpos[0] - 1 : curpos[0] + 2, curpos[1] - 1 : curpos[1] + 2
+        ]
         if sbox.sum() == 0:
             break
         # move current position
@@ -595,7 +615,9 @@ def relative_angle(v, ref):
 
     assuming that v = (y, x)
     """
-    return np.arctan2(v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0])
+    return np.arctan2(
+        v[0] * ref[1] - v[1] * ref[0], v[1] * ref[1] + v[0] * ref[0]
+    )
 
 
 def get_indexer(img, ch_axis, ch_slice):
@@ -642,7 +664,9 @@ endpoint_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
 
 
 def __find_endpoints(img):
-    endpt_response = convolve2d(img.astype(np.uint8), endpoint_kernel, mode="same")
+    endpt_response = convolve2d(
+        img.astype(np.uint8), endpoint_kernel, mode="same"
+    )
     endpts = np.where(endpt_response == 11)
     return endpts
 
@@ -677,6 +701,52 @@ def trim_skeleton_to_endpoints(skelimg, n_ends=2):
 
         survived_epts = tuple([dict_eps[i][0] for i in eid_])
         return wrk, survived_epts
+
+
+def find_back_pos(cellmask, front_pos, centroid):
+    """find the back of the cell
+
+    Args:
+        cellmask (boolean 2d np.array): cell mask
+        front_pos (2-tuple or 2-element np.array): (y,x) coordinate of migration front
+        centroid (2-tuple or 2-element np.array): (y,x) coordinate of centroid. For example,
+        can be the nucleus or the cell centroid. Distance map will be computed
+        fromt this position.
+
+    Return:
+        angle_map, distance_map, back_position
+
+    """
+    # get mask indices (coordinates)
+    ymask, xmask = np.where(cellmask)
+
+    # dy, dx w.r.t from edge to centroid
+    dy = front_pos[0] - centroid[0]
+    dx = front_pos[1] - centroid[1]
+
+    # calculate the migration edge w.r.t input centroid
+    theta = np.arctan2(dy, dx)
+
+    # compute angles wrt center and edge
+    angle_vals = np.arctan2(ymask - centroid[0], xmask - centroid[1])
+    angle_map = np.zeros(cellmask.shape)
+    # adjust angle by theta
+    adj_angle_vals = angle_vals - theta
+    # wrap angles to -pi,pi (the opposite of np.unwrap)
+    angle_map[ymask, xmask] = (adj_angle_vals + np.pi) % (2 * np.pi) - np.pi
+
+    # compute distance transform
+    boolarr_origin = np.zeros(cellmask.shape, dtype=np.uint8)
+    boolarr_origin[int(centroid[0]), int(centroid[1])] = True
+    dist_map = distance_transform_edt(np.logical_not(boolarr_origin))
+
+    # find pixels where angle is near 180˚ or π
+    angle_devs = np.abs(angle_map - np.pi)
+    crit1 = angle_devs < 1e-2
+    crit2 = dist_map * crit1
+    back_pos = np.unravel_index(np.argmax(crit2), angle_devs.shape)
+
+    return angle_map, dist_map, back_pos
 
 
 def fft_binary_erosion(img, strel):

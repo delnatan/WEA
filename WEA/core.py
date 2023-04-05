@@ -63,7 +63,7 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3c")
+DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3d")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v1b")
 DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v3d")
 

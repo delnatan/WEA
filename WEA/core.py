@@ -288,7 +288,10 @@ class ImageField:
         cp_output = cv2.resize(
             self.cp_labcells, targetsize, interpolation=cv2.INTER_NEAREST
         )
-        return cp_output, woundedge
+        cp_nucleus = cv2.resize(
+            self.cp_labnucs, targetsize, interpolation=cv2.INTER_NEAREST
+        )
+        return cp_output, cp_nucleus, woundedge
 
     def edge_cells(self, nuc_diam=15.0):
         """iterator function that yields edge cells

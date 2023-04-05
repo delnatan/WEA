@@ -4,7 +4,7 @@ Wound edge analysis modules and functions
 """
 import logging
 import re
-
+import pdb
 from itertools import chain
 from pathlib import Path
 
@@ -30,11 +30,15 @@ from . import __file__
 from .vis import makeRGBComposite
 
 # check whether GPU is available
-if torch.cuda.is_available():
+if torch.cuda.is_available() or torch.backends.mps.is_available():
     use_gpu = True
+    if torch.backends.mps.is_available():
+        gpu_device = torch.device("mps")
+    else:
+        gpu_device = torch.device("cuda")
 else:
     use_gpu = False
-
+    gpu_device = torch.device("cpu")
 
 # get current module path by using the __file__ attribute
 __module_dir = Path(__file__).parent
@@ -59,23 +63,11 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-
-# custom models are stored in $HOME/.cellpose/models
-# cytoengine = models.CellposeModel(
-#     gpu=use_gpu,
-#     pretrained_model=str(__model_dir / "CP_bcat-nuc_v02_blur"),
-# )
-
-# nucengine = models.CellposeModel(
-#     gpu=use_gpu, pretrained_model=str(__model_dir / "CP_dapi_v01")
-# )
-
 DEFAULT_CYTO_PATH = str(__model_dir / "CP_bcat-nuc_v3c")
 DEFAULT_NUC_PATH = str(__model_dir / "CP_dapi_v1b")
 DEFAULT_TUBASCYTO_PATH = str(__model_dir / "CP_tub-nuc_v3d")
 
 logger.info(f"Using models from {str(__model_dir)}")
-
 
 endpt_kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.float64)
 
@@ -122,12 +114,12 @@ class ImageField:
     def _load_cellpose_model(
         self, cyto_model_path=DEFAULT_CYTO_PATH, nuc_model_path=DEFAULT_NUC_PATH
     ):
-
         self.cytoengine = models.CellposeModel(
-            gpu=use_gpu, pretrained_model=cyto_model_path
+            gpu=use_gpu, pretrained_model=cyto_model_path, device=gpu_device
         )
+
         self.nucengine = models.CellposeModel(
-            gpu=use_gpu, pretrained_model=nuc_model_path
+            gpu=use_gpu, pretrained_model=nuc_model_path, device=gpu_device
         )
 
     def _create_cellpose_input(
@@ -181,7 +173,7 @@ class ImageField:
         img, scaled_dxy = self._create_cellpose_input(
             unscaled_cell_diam, downsize=downsize
         )
-
+        self._scaled_dxy = scaled_dxy
         self._celldiam = celldiam / scaled_dxy
         self._nucdiam = nucdiam / scaled_dxy
 
@@ -288,10 +280,19 @@ class ImageField:
         cp_output = cv2.resize(
             self.cp_labcells, targetsize, interpolation=cv2.INTER_NEAREST
         )
+
+        # get the nucleus radius (in full-sized image)
+        nucleus_opening_radius = int(
+            np.round((self._nucdiam * 0.5) / self._scaled_dxy))
+
         cp_nucleus = cv2.resize(
             self.cp_labnucs, targetsize, interpolation=cv2.INTER_NEAREST
         )
-        return cp_output, cp_nucleus, woundedge
+        cell_nucs = fft_binary_opening(
+            cp_nucleus > 0, disk(nucleus_opening_radius))
+        cell_nucs = cell_nucs.astype(int) * cp_output
+
+        return cp_output, cell_nucs, woundedge
 
     def edge_cells(self, nuc_diam=15.0):
         """iterator function that yields edge cells
@@ -305,7 +306,7 @@ class ImageField:
         raw data, cytoplasm mask, wound edge, nucleus mask
 
         """
-        nucleus_opening_radius = int(np.round(nuc_diam / 4) / self.dxy)
+        nucleus_opening_radius = int(np.round(nuc_diam * 0.25 / self.dxy))
 
         # get label ids for cells at the edge
         woundcells = self.labcells * self.woundedge
@@ -324,6 +325,7 @@ class ImageField:
         nuc_mask = cv2.resize(
             self.labnucs, (self.Nx, self.Ny), interpolation=cv2.INTER_NEAREST
         )
+
         # do the binary opening via fft
         cell_nucs = fft_binary_opening(
             nuc_mask > 0, disk(nucleus_opening_radius)
@@ -353,14 +355,14 @@ class ImageField:
             else:
                 pass
 
-    def run_analysis(self, img_tag):
+    def run_analysis(self, img_tag, nuc_diam=15.0):
         """do single-cell analysis for this ImageField"""
         # for mtoc stats
         datacol = []
         # for cell stats
         cellcol = []
 
-        for i, d, m, n, w, yxoffset in self.edge_cells():
+        for i, d, m, n, w, yxoffset in self.edge_cells(nuc_diam=nuc_diam):
 
             try:
                 ec = EdgeCell(i, d, m, n, w)
